@@ -1,0 +1,3 @@
+#Battery.msg
+std_msgs/Header header
+float32 value

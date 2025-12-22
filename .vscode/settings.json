@@ -1,0 +1,18 @@
+{
+    "python.autoComplete.extraPaths": [
+        "/home/eyas/fromscratch/install/rover_ros/lib/python3.10/site-packages",
+        "/home/eyas/fromscratch/install/pyrover/lib/python3.10/site-packages",
+        "/home/eyas/fromscratch/install/lidar_interface/lib/python3.10/site-packages",
+        "/home/eyas/fromscratch/install/rover_msgs/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ],
+    "python.analysis.extraPaths": [
+        "/home/eyas/fromscratch/install/rover_ros/lib/python3.10/site-packages",
+        "/home/eyas/fromscratch/install/pyrover/lib/python3.10/site-packages",
+        "/home/eyas/fromscratch/install/lidar_interface/lib/python3.10/site-packages",
+        "/home/eyas/fromscratch/install/rover_msgs/local/lib/python3.10/dist-packages",
+        "/opt/ros/humble/lib/python3.10/site-packages",
+        "/opt/ros/humble/local/lib/python3.10/dist-packages"
+    ]
+}

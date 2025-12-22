@@ -1,0 +1,55 @@
+# PyRover ROS2 Driver Configuration
+#
+# This file contains all parameters for the rover_ros package
+# Edit the calibration values after running:
+#   pyrover-calibrate-motors --port /dev/serial0
+
+/**:
+  ros__parameters:
+    # =========================================
+    # Serial Connection
+    # =========================================
+    port: "/dev/serial0"
+    baudrate: 115200
+    max_speed: 0.5     # Maximum PWM value (0.5 = 100%)
+    
+    # =========================================
+    # Motor Calibration
+    # =========================================
+    # These gains convert cmd_vel (m/s, rad/s) to wheel commands.
+    # Run `pyrover-calibrate-motors` to find optimal values.
+    #
+    # Tuning guide:
+    # - Robot moves too slow? Increase linear_gain
+    # - Robot turns too slow? Increase angular_gain
+    # - Robot overshoots turns? Decrease angular_gain
+    
+    linear_gain: 1.0
+    angular_gain: 0.333
+    
+    # =========================================
+    # Publishing Settings
+    # =========================================
+    # Publish rate is applicable to sensor polling IMU, 
+    # Temperature, Chassis, Wheels, and Emerngency
+    publish_imu: true
+    publish_battery: true 
+    publish_tf: true
+    publish_rate: 20.0
+    frame_id: "base_link"
+    odom_frame_id: "odom"
+    
+    # =========================================
+    # Battery Monitoring
+    # =========================================
+    # Default: 3S 18650 cells (common WAVE ROVER configuration)
+    battery_cells: 3
+    battery_capacity_mah: 2600
+
+    # =========================================
+    # Localization
+    # =========================================
+    # To determine its own pose, the bot needs to perform localization
+    # Choose type: dead_reckoning, imu, bayes, kalman
+    # See `rover_ros\pose_estimator.py` for more information
+    localization_mode: imu
