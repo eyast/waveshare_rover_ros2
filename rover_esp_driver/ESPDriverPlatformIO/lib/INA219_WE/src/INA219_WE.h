@@ -34,7 +34,8 @@
 #endif
 
 /* registers */
-#define INA219_ADDRESS      0x40
+//#define INA219_ADDRESS      0x40
+#define INA219_ADDRESS      0x42
 #define INA219_CONF_REG     0x00 //Configuration Register
 #define INA219_SHUNT_REG    0x01 //Shunt Voltage Register
 #define INA219_BUS_REG      0x02 //Bus Voltage Register

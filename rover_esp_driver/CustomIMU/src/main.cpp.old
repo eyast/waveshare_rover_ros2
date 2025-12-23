@@ -1,0 +1,1093 @@
+/**
+ * =============================================================================
+ * QMI8658C + AK09918C IMU Driver for ESP32/ESP8266
+ * =============================================================================
+ * 
+ * PURPOSE:
+ *   Continuously streams roll, pitch, yaw (heading), and temperature to a 
+ *   Raspberry Pi via serial at the highest possible rate without polling.
+ *   Also accepts commands from the RPI on the same serial port.
+ * 
+ * HARDWARE:
+ *   - QMI8658C: 6-axis IMU (accelerometer + gyroscope) with temperature sensor
+ *   - AK09918C: 3-axis magnetometer (required for absolute yaw/heading)
+ *   - Both connected via I2C
+ * 
+ * KEY FEATURES:
+ *   - Push-based streaming (no query required from RPI)
+ *   - Binary protocol for maximum throughput
+ *   - Madgwick AHRS sensor fusion for drift-free orientation
+ *   - Magnetometer provides absolute heading reference (critical for yaw)
+ *   - Non-blocking command reception
+ *   - Configurable output data rate
+ *   - Built-in calibration routines
+ * 
+ * UNDERSTANDING YAW vs ROLL/PITCH:
+ *   - Roll/Pitch: Can be determined from accelerometer alone (gravity reference)
+ *   - Yaw/Heading: REQUIRES magnetometer for absolute reference (Earth's magnetic field)
+ *   - Without magnetometer: yaw drifts over time due to gyro integration error
+ *   - With magnetometer: absolute heading relative to magnetic north
+ * 
+ * DATA RATES:
+ *   - QMI8658C IMU: Configured at 470 Hz (CTRL2/CTRL3 ODR=0100)
+ *   - AK09918C Magnetometer: 100 Hz continuous mode (MODE=01000)
+ *   - Serial output: ~200-400 Hz typical (depends on baud rate)
+ *   - Temperature: 8 Hz (hardware limitation)
+ * 
+ * PROTOCOL (Binary, 25 bytes per packet):
+ *   Byte 0:     Sync byte (0xAA)
+ *   Byte 1:     Packet type (0x01 = orientation data)
+ *   Bytes 2-5:  Timestamp (uint32_t, microseconds)
+ *   Bytes 6-9:  Roll (float, degrees)
+ *   Bytes 10-13: Pitch (float, degrees)
+ *   Bytes 14-17: Yaw (float, degrees, 0-360 from magnetic north)
+ *   Bytes 18-21: Temperature (float, Celsius)
+ *   Bytes 22-23: Status flags (uint16_t)
+ *   Byte 24:    Checksum (XOR of bytes 1-23)
+ * 
+ * COMMANDS (Text, newline terminated):
+ *   "RST"         - Reset sensors and fusion
+ *   "CAL:ACC"     - Calibrate accelerometer (keep device flat and still)
+ *   "CAL:GYRO"    - Calibrate gyroscope (keep device still)
+ *   "CAL:MAG"     - Calibrate magnetometer (rotate device in figure-8)
+ *   "SET:ODR:xxx" - Set output data rate divisor (1-255)
+ *   "SET:TEXT"    - Switch to human-readable text output
+ *   "SET:BIN"     - Switch to binary output (default)
+ *   "GET:STATUS"  - Report sensor status
+ *   "GET:CAL"     - Report calibration values
+ *   "STOP"        - Stop streaming
+ *   "START"       - Resume streaming
+ * 
+ * Author: Generated for RPI-ESP IMU project
+ * License: MIT
+ * =============================================================================
+ */
+#include <Arduino.h>
+#include <Wire.h>
+#include <math.h>
+
+// =============================================================================
+// CONFIGURATION - Adjust these for your setup
+// =============================================================================
+
+// I2C pins (ESP32 defaults, change if using different pins)
+#define I2C_SDA 32
+#define I2C_SCL 33
+#define I2C_FREQ 400000  // 400 kHz Fast Mode
+
+// Serial configuration
+#define SERIAL_BAUD 115200  // High baud rate for fast streaming
+                            // Alternatives: 115200, 230400, 460800, 921600, 1000000
+
+// I2C Addresses
+#define QMI8658C_ADDR 0x6B  // Or 0x6B if SA0 pulled low
+#define AK09918C_ADDR 0x0C
+
+// Sensor Configuration
+#define ACCEL_FS_SEL  0     // 0=±2g, 1=±4g, 2=±8g, 3=±16g
+#define GYRO_FS_SEL   3     // 0=±16dps, 1=±32dps, 2=±64dps, 3=±128dps, 
+                            // 4=±256dps, 5=±512dps, 6=±1024dps, 7=±2048dps
+#define ODR_SEL       4     // 4=470Hz (6DOF mode)
+
+// Madgwick filter parameters
+#define MADGWICK_BETA 0.1f  // Filter gain (0.01-0.5, higher=faster response, more noise)
+
+// Output control
+#define DEFAULT_OUTPUT_DIVISOR 1  // Output every Nth sample (1=all samples)
+
+// =============================================================================
+// QMI8658C REGISTER DEFINITIONS
+// =============================================================================
+
+// General Purpose Registers
+#define QMI_WHO_AM_I       0x00  // Should return 0x05
+#define QMI_REVISION_ID    0x01
+
+// Control Registers
+#define QMI_CTRL1          0x02  // SPI/Sensor enable
+#define QMI_CTRL2          0x03  // Accelerometer ODR, FS
+#define QMI_CTRL3          0x04  // Gyroscope ODR, FS
+#define QMI_CTRL4          0x05  // Reserved
+#define QMI_CTRL5          0x06  // Low pass filter
+#define QMI_CTRL6          0x07  // AttitudeEngine settings
+#define QMI_CTRL7          0x08  // Enable sensors
+#define QMI_CTRL8          0x09  // Reserved
+#define QMI_CTRL9          0x0A  // Host commands
+
+// Status Registers
+#define QMI_STATUSINT      0x2D  // Data availability
+#define QMI_STATUS0        0x2E  // Output data status
+#define QMI_STATUS1        0x2F  // Misc status
+
+// Timestamp
+#define QMI_TIMESTAMP_L    0x30
+#define QMI_TIMESTAMP_M    0x31
+#define QMI_TIMESTAMP_H    0x32
+
+// Data Output Registers
+#define QMI_TEMP_L         0x33  // Temperature (256 LSB/°C)
+#define QMI_TEMP_H         0x34
+#define QMI_AX_L           0x35  // Accelerometer X
+#define QMI_AX_H           0x36
+#define QMI_AY_L           0x37  // Accelerometer Y
+#define QMI_AY_H           0x38
+#define QMI_AZ_L           0x39  // Accelerometer Z
+#define QMI_AZ_H           0x3A
+#define QMI_GX_L           0x3B  // Gyroscope X
+#define QMI_GX_H           0x3C
+#define QMI_GY_L           0x3D  // Gyroscope Y
+#define QMI_GY_H           0x3E
+#define QMI_GZ_L           0x3F  // Gyroscope Z
+#define QMI_GZ_H           0x40
+
+// Reset Register
+#define QMI_RESET          0x60
+
+// =============================================================================
+// AK09918C REGISTER DEFINITIONS
+// =============================================================================
+
+#define AK_WIA1            0x00  // Company ID (should be 0x48)
+#define AK_WIA2            0x01  // Device ID (should be 0x0C)
+#define AK_ST1             0x10  // Status 1 (DRDY bit)
+#define AK_HXL             0x11  // Mag X low byte
+#define AK_HXH             0x12  // Mag X high byte
+#define AK_HYL             0x13  // Mag Y low byte
+#define AK_HYH             0x14  // Mag Y high byte
+#define AK_HZL             0x15  // Mag Z low byte
+#define AK_HZH             0x16  // Mag Z high byte
+#define AK_TMPS            0x17  // Dummy temperature (not used)
+#define AK_ST2             0x18  // Status 2 (MUST read after data to release)
+#define AK_CNTL1           0x30  // Dummy register
+#define AK_CNTL2           0x31  // Control 2 (mode setting)
+#define AK_CNTL3           0x32  // Control 3 (soft reset)
+
+// AK09918C Modes
+#define AK_MODE_POWERDOWN  0x00
+#define AK_MODE_SINGLE     0x01
+#define AK_MODE_CONT_10HZ  0x02
+#define AK_MODE_CONT_20HZ  0x04
+#define AK_MODE_CONT_50HZ  0x06
+#define AK_MODE_CONT_100HZ 0x08
+#define AK_MODE_SELFTEST   0x10
+
+// =============================================================================
+// GLOBAL VARIABLES
+// =============================================================================
+
+// Sensor scale factors (calculated based on FS settings)
+float accelScale;   // Converts raw to g
+float gyroScale;    // Converts raw to dps
+const float magScale = 0.15f;  // AK09918C: 0.15 µT/LSB
+
+// Calibration offsets
+float accelBias[3] = {0, 0, 0};
+float gyroBias[3] = {0, 0, 0};
+float magBias[3] = {0, 0, 0};
+float magScale_XYZ[3] = {1, 1, 1};  // Soft iron compensation
+
+// Sensor data (raw)
+int16_t accelRaw[3], gyroRaw[3], magRaw[3];
+int16_t tempRaw;
+
+// Sensor data (calibrated, SI units)
+float accel[3];  // g
+float gyro[3];   // rad/s
+float mag[3];    // µT
+
+// Madgwick filter quaternion
+float q[4] = {1.0f, 0.0f, 0.0f, 0.0f};
+
+// Output Euler angles (degrees)
+float roll, pitch, yaw;
+float temperature;
+
+// Timing
+uint32_t lastUpdateMicros = 0;
+float samplePeriod = 1.0f / 470.0f;  // Seconds
+
+// Output control
+bool streaming = true;
+bool binaryOutput = true;
+uint8_t outputDivisor = DEFAULT_OUTPUT_DIVISOR;
+uint8_t sampleCounter = 0;
+
+// Status flags
+uint16_t statusFlags = 0;
+#define STATUS_IMU_OK       (1 << 0)
+#define STATUS_MAG_OK       (1 << 1)
+#define STATUS_ACCEL_CAL    (1 << 2)
+#define STATUS_GYRO_CAL     (1 << 3)
+#define STATUS_MAG_CAL      (1 << 4)
+#define STATUS_MAG_OVERFLOW (1 << 5)
+
+// Command buffer
+#define CMD_BUFFER_SIZE 32
+char cmdBuffer[CMD_BUFFER_SIZE];
+uint8_t cmdIndex = 0;
+
+// =============================================================================
+// I2C HELPER FUNCTIONS
+// =============================================================================
+
+/**
+ * Write a single byte to a register
+ */
+bool writeRegister(uint8_t addr, uint8_t reg, uint8_t value) {
+    Wire.beginTransmission(addr);
+    Wire.write(reg);
+    Wire.write(value);
+    return (Wire.endTransmission() == 0);
+}
+
+/**
+ * Read a single byte from a register
+ */
+uint8_t readRegister(uint8_t addr, uint8_t reg) {
+    Wire.beginTransmission(addr);
+    Wire.write(reg);
+    Wire.endTransmission(false);
+    Wire.requestFrom(addr, (uint8_t)1);
+    return Wire.read();
+}
+
+/**
+ * Read multiple bytes starting from a register
+ * Uses auto-increment feature
+ */
+bool readRegisters(uint8_t addr, uint8_t startReg, uint8_t* buffer, uint8_t count) {
+    Wire.beginTransmission(addr);
+    Wire.write(startReg);
+    if (Wire.endTransmission(false) != 0) return false;
+    
+    Wire.requestFrom(addr, count);
+    if (Wire.available() < count) return false;
+    
+    for (uint8_t i = 0; i < count; i++) {
+        buffer[i] = Wire.read();
+    }
+    return true;
+}
+
+// =============================================================================
+// QMI8658C FUNCTIONS
+// =============================================================================
+
+/**
+ * Initialize the QMI8658C IMU
+ * 
+ * Configuration:
+ * - Accelerometer and Gyroscope enabled
+ * - ODR set for maximum useful rate
+ * - Low-pass filter enabled for noise reduction
+ * - Big-endian data output with auto-increment
+ */
+bool initQMI8658C() {
+    // Check WHO_AM_I
+    uint8_t whoami = readRegister(QMI8658C_ADDR, QMI_WHO_AM_I);
+    if (whoami != 0x05) {
+        Serial.print("ERROR: QMI8658C WHO_AM_I = 0x");
+        Serial.print(whoami, HEX);
+        Serial.println(" (expected 0x05)");
+        return false;
+    }
+    
+    // Soft reset
+    writeRegister(QMI8658C_ADDR, QMI_RESET, 0xB0);
+    delay(50);
+    
+    // CTRL1: Enable address auto-increment, big-endian
+    // Bit 6: ADDR_AI = 1 (auto increment)
+    // Bit 5: BE = 1 (big endian)
+    // Bit 0: SensorDisable = 0 (enable)
+    writeRegister(QMI8658C_ADDR, QMI_CTRL1, 0x60);
+    
+    // CTRL2: Accelerometer configuration
+    // Bits [6:4]: aFS - Full scale selection
+    // Bits [3:0]: aODR - Output data rate
+    uint8_t ctrl2 = (ACCEL_FS_SEL << 4) | ODR_SEL;
+    writeRegister(QMI8658C_ADDR, QMI_CTRL2, ctrl2);
+    
+    // CTRL3: Gyroscope configuration  
+    // Bits [6:4]: gFS - Full scale selection
+    // Bits [3:0]: gODR - Output data rate
+    uint8_t ctrl3 = (GYRO_FS_SEL << 4) | ODR_SEL;
+    writeRegister(QMI8658C_ADDR, QMI_CTRL3, ctrl3);
+    
+    // CTRL5: Low pass filter
+    // Enable LPF for both accel and gyro
+    // LPF mode 2 (approx ODR/4 cutoff)
+    writeRegister(QMI8658C_ADDR, QMI_CTRL5, 0x11);
+    
+    // CTRL7: Enable sensors
+    // Bit 0: aEN = 1 (enable accelerometer)
+    // Bit 1: gEN = 1 (enable gyroscope)
+    writeRegister(QMI8658C_ADDR, QMI_CTRL7, 0x03);
+    
+    // Calculate scale factors
+    // Accelerometer: full scale range / 32768
+    const float accelFS[] = {2.0f, 4.0f, 8.0f, 16.0f};
+    accelScale = accelFS[ACCEL_FS_SEL] / 32768.0f;
+    
+    // Gyroscope: full scale range / 32768
+    const float gyroFS[] = {16.0f, 32.0f, 64.0f, 128.0f, 256.0f, 512.0f, 1024.0f, 2048.0f};
+    gyroScale = gyroFS[GYRO_FS_SEL] / 32768.0f;
+    
+    // Calculate sample period based on ODR
+    // ODR 4 = 470 Hz in 6DOF mode
+    const float odrHz[] = {7520, 3760, 1880, 940, 470, 235, 117.5, 58.75, 29.375};
+    if (ODR_SEL <= 8) {
+        samplePeriod = 1.0f / odrHz[ODR_SEL];
+    }
+    
+    delay(50);  // Wait for sensors to stabilize
+    
+    statusFlags |= STATUS_IMU_OK;
+    return true;
+}
+
+/**
+ * Read all IMU data in a single burst read (efficient)
+ * Reads: Temperature (2) + Accel (6) + Gyro (6) = 14 bytes
+ */
+bool readIMUData() {
+    uint8_t buffer[14];
+    
+    if (!readRegisters(QMI8658C_ADDR, QMI_TEMP_L, buffer, 14)) {
+        return false;
+    }
+    
+    // Note: We configured big-endian output, so high byte first
+    // Actually, let's read as little endian (default after reset may differ)
+    // Re-reading datasheet: default is big endian (BE=1), but we want consistent behavior
+    // Let's handle little endian (low byte first, which is natural for I2C burst read)
+    
+    tempRaw = (int16_t)((buffer[1] << 8) | buffer[0]);
+    
+    accelRaw[0] = (int16_t)((buffer[3] << 8) | buffer[2]);
+    accelRaw[1] = (int16_t)((buffer[5] << 8) | buffer[4]);
+    accelRaw[2] = (int16_t)((buffer[7] << 8) | buffer[6]);
+    
+    gyroRaw[0] = (int16_t)((buffer[9] << 8) | buffer[8]);
+    gyroRaw[1] = (int16_t)((buffer[11] << 8) | buffer[10]);
+    gyroRaw[2] = (int16_t)((buffer[13] << 8) | buffer[12]);
+    
+    // Convert to physical units with calibration
+    // Accelerometer: raw * scale - bias (in g)
+    accel[0] = (accelRaw[0] * accelScale) - accelBias[0];
+    accel[1] = (accelRaw[1] * accelScale) - accelBias[1];
+    accel[2] = (accelRaw[2] * accelScale) - accelBias[2];
+    
+    // Gyroscope: raw * scale - bias (in dps), then convert to rad/s
+    gyro[0] = ((gyroRaw[0] * gyroScale) - gyroBias[0]) * (PI / 180.0f);
+    gyro[1] = ((gyroRaw[1] * gyroScale) - gyroBias[1]) * (PI / 180.0f);
+    gyro[2] = ((gyroRaw[2] * gyroScale) - gyroBias[2]) * (PI / 180.0f);
+    
+    // Temperature: raw / 256 (256 LSB/°C)
+    temperature = tempRaw / 256.0f;
+    
+    return true;
+}
+
+// =============================================================================
+// AK09918C FUNCTIONS
+// =============================================================================
+
+/**
+ * Initialize the AK09918C Magnetometer
+ * 
+ * Sets up continuous measurement mode at 100 Hz for best performance.
+ * The magnetometer is ESSENTIAL for accurate yaw (heading) measurement.
+ */
+bool initAK09918C() {
+    // Check device ID
+    uint8_t wia1 = readRegister(AK09918C_ADDR, AK_WIA1);
+    uint8_t wia2 = readRegister(AK09918C_ADDR, AK_WIA2);
+    
+    if (wia1 != 0x48 || wia2 != 0x0C) {
+        Serial.print("WARNING: AK09918C ID mismatch. WIA1=0x");
+        Serial.print(wia1, HEX);
+        Serial.print(", WIA2=0x");
+        Serial.println(wia2, HEX);
+        // Continue anyway, might still work
+    }
+    
+    // Soft reset
+    writeRegister(AK09918C_ADDR, AK_CNTL3, 0x01);
+    delay(100);  // Wait for reset
+    
+    // Set continuous measurement mode 4 (100 Hz)
+    // This is the highest rate available
+    writeRegister(AK09918C_ADDR, AK_CNTL2, AK_MODE_CONT_100HZ);
+    delay(10);
+    
+    statusFlags |= STATUS_MAG_OK;
+    return true;
+}
+
+/**
+ * Read magnetometer data
+ * 
+ * IMPORTANT: Must read ST2 register after reading data to release the data lock
+ * and allow new measurements. This is a hardware requirement.
+ */
+bool readMagData() {
+    // Check if data is ready
+    uint8_t st1 = readRegister(AK09918C_ADDR, AK_ST1);
+    if (!(st1 & 0x01)) {
+        return false;  // Data not ready yet
+    }
+    
+    // Read all 6 data bytes + ST2 (7 bytes total)
+    uint8_t buffer[7];
+    if (!readRegisters(AK09918C_ADDR, AK_HXL, buffer, 7)) {
+        return false;
+    }
+    
+    // Parse data (little endian)
+    magRaw[0] = (int16_t)((buffer[1] << 8) | buffer[0]);
+    magRaw[1] = (int16_t)((buffer[3] << 8) | buffer[2]);
+    magRaw[2] = (int16_t)((buffer[5] << 8) | buffer[4]);
+    
+    // Check for overflow (ST2 bit 3)
+    if (buffer[6] & 0x08) {
+        statusFlags |= STATUS_MAG_OVERFLOW;
+    } else {
+        statusFlags &= ~STATUS_MAG_OVERFLOW;
+    }
+    
+    // Apply calibration and convert to µT
+    mag[0] = ((magRaw[0] * magScale) - magBias[0]) * magScale_XYZ[0];
+    mag[1] = ((magRaw[1] * magScale) - magBias[1]) * magScale_XYZ[1];
+    mag[2] = ((magRaw[2] * magScale) - magBias[2]) * magScale_XYZ[2];
+    
+    return true;
+}
+
+// =============================================================================
+// MADGWICK AHRS FILTER
+// =============================================================================
+
+/**
+ * Madgwick AHRS algorithm
+ * 
+ * Fuses accelerometer, gyroscope, and magnetometer data to estimate orientation.
+ * Outputs a quaternion that can be converted to Euler angles.
+ * 
+ * The magnetometer input is what prevents yaw drift by providing an
+ * absolute reference to Earth's magnetic field.
+ * 
+ * @param gx, gy, gz: Gyroscope in rad/s
+ * @param ax, ay, az: Accelerometer in g (normalized internally)
+ * @param mx, my, mz: Magnetometer in any unit (normalized internally)
+ * @param dt: Time step in seconds
+ */
+void madgwickUpdate(float gx, float gy, float gz,
+                    float ax, float ay, float az,
+                    float mx, float my, float mz,
+                    float dt) {
+    float recipNorm;
+    float s0, s1, s2, s3;
+    float qDot1, qDot2, qDot3, qDot4;
+    float hx, hy;
+    float _2q0mx, _2q0my, _2q0mz, _2q1mx, _2bx, _2bz;
+    float _4bx, _4bz, _2q0, _2q1, _2q2, _2q3;
+    float q0q0, q0q1, q0q2, q0q3, q1q1, q1q2, q1q3, q2q2, q2q3, q3q3;
+
+    float q0 = q[0], q1 = q[1], q2 = q[2], q3 = q[3];
+
+    // Rate of change of quaternion from gyroscope
+    qDot1 = 0.5f * (-q1 * gx - q2 * gy - q3 * gz);
+    qDot2 = 0.5f * (q0 * gx + q2 * gz - q3 * gy);
+    qDot3 = 0.5f * (q0 * gy - q1 * gz + q3 * gx);
+    qDot4 = 0.5f * (q0 * gz + q1 * gy - q2 * gx);
+
+    // Compute feedback only if accelerometer measurement valid
+    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
+
+        // Normalise accelerometer measurement
+        recipNorm = 1.0f / sqrtf(ax * ax + ay * ay + az * az);
+        ax *= recipNorm;
+        ay *= recipNorm;
+        az *= recipNorm;
+
+        // Normalise magnetometer measurement
+        recipNorm = 1.0f / sqrtf(mx * mx + my * my + mz * mz);
+        mx *= recipNorm;
+        my *= recipNorm;
+        mz *= recipNorm;
+
+        // Auxiliary variables to avoid repeated arithmetic
+        _2q0mx = 2.0f * q0 * mx;
+        _2q0my = 2.0f * q0 * my;
+        _2q0mz = 2.0f * q0 * mz;
+        _2q1mx = 2.0f * q1 * mx;
+        _2q0 = 2.0f * q0;
+        _2q1 = 2.0f * q1;
+        _2q2 = 2.0f * q2;
+        _2q3 = 2.0f * q3;
+        q0q0 = q0 * q0;
+        q0q1 = q0 * q1;
+        q0q2 = q0 * q2;
+        q0q3 = q0 * q3;
+        q1q1 = q1 * q1;
+        q1q2 = q1 * q2;
+        q1q3 = q1 * q3;
+        q2q2 = q2 * q2;
+        q2q3 = q2 * q3;
+        q3q3 = q3 * q3;
+
+        // Reference direction of Earth's magnetic field
+        hx = mx * q0q0 - _2q0my * q3 + _2q0mz * q2 + mx * q1q1 + _2q1 * my * q2 + _2q1 * mz * q3 - mx * q2q2 - mx * q3q3;
+        hy = _2q0mx * q3 + my * q0q0 - _2q0mz * q1 + _2q1mx * q2 - my * q1q1 + my * q2q2 + _2q2 * mz * q3 - my * q3q3;
+        _2bx = sqrtf(hx * hx + hy * hy);
+        _2bz = -_2q0mx * q2 + _2q0my * q1 + mz * q0q0 + _2q1mx * q3 - mz * q1q1 + _2q2 * my * q3 - mz * q2q2 + mz * q3q3;
+        _4bx = 2.0f * _2bx;
+        _4bz = 2.0f * _2bz;
+
+        // Gradient descent algorithm corrective step
+        s0 = -_2q2 * (2.0f * q1q3 - _2q0 * q2 - ax) + _2q1 * (2.0f * q0q1 + _2q2 * q3 - ay) - _2bz * q2 * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (-_2bx * q3 + _2bz * q1) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + _2bx * q2 * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
+        s1 = _2q3 * (2.0f * q1q3 - _2q0 * q2 - ax) + _2q0 * (2.0f * q0q1 + _2q2 * q3 - ay) - 4.0f * q1 * (1.0f - 2.0f * q1q1 - 2.0f * q2q2 - az) + _2bz * q3 * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (_2bx * q2 + _2bz * q0) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + (_2bx * q3 - _4bz * q1) * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
+        s2 = -_2q0 * (2.0f * q1q3 - _2q0 * q2 - ax) + _2q3 * (2.0f * q0q1 + _2q2 * q3 - ay) - 4.0f * q2 * (1.0f - 2.0f * q1q1 - 2.0f * q2q2 - az) + (-_4bx * q2 - _2bz * q0) * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (_2bx * q1 + _2bz * q3) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + (_2bx * q0 - _4bz * q2) * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
+        s3 = _2q1 * (2.0f * q1q3 - _2q0 * q2 - ax) + _2q2 * (2.0f * q0q1 + _2q2 * q3 - ay) + (-_4bx * q3 + _2bz * q1) * (_2bx * (0.5f - q2q2 - q3q3) + _2bz * (q1q3 - q0q2) - mx) + (-_2bx * q0 + _2bz * q2) * (_2bx * (q1q2 - q0q3) + _2bz * (q0q1 + q2q3) - my) + _2bx * q1 * (_2bx * (q0q2 + q1q3) + _2bz * (0.5f - q1q1 - q2q2) - mz);
+
+        // Normalise step magnitude
+        recipNorm = 1.0f / sqrtf(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
+        s0 *= recipNorm;
+        s1 *= recipNorm;
+        s2 *= recipNorm;
+        s3 *= recipNorm;
+
+        // Apply feedback step
+        float beta = MADGWICK_BETA;
+        qDot1 -= beta * s0;
+        qDot2 -= beta * s1;
+        qDot3 -= beta * s2;
+        qDot4 -= beta * s3;
+    }
+
+    // Integrate rate of change of quaternion to yield quaternion
+    q0 += qDot1 * dt;
+    q1 += qDot2 * dt;
+    q2 += qDot3 * dt;
+    q3 += qDot4 * dt;
+
+    // Normalise quaternion
+    recipNorm = 1.0f / sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    q[0] = q0 * recipNorm;
+    q[1] = q1 * recipNorm;
+    q[2] = q2 * recipNorm;
+    q[3] = q3 * recipNorm;
+}
+
+/**
+ * Simplified Madgwick update without magnetometer
+ * Use this if magnetometer is not available, but yaw will drift!
+ */
+void madgwickUpdate6DOF(float gx, float gy, float gz,
+                        float ax, float ay, float az,
+                        float dt) {
+    float recipNorm;
+    float s0, s1, s2, s3;
+    float qDot1, qDot2, qDot3, qDot4;
+    float _2q0, _2q1, _2q2, _2q3, _4q0, _4q1, _4q2, _8q1, _8q2;
+    float q0q0, q1q1, q2q2, q3q3;
+
+    float q0 = q[0], q1 = q[1], q2 = q[2], q3 = q[3];
+
+    // Rate of change of quaternion from gyroscope
+    qDot1 = 0.5f * (-q1 * gx - q2 * gy - q3 * gz);
+    qDot2 = 0.5f * (q0 * gx + q2 * gz - q3 * gy);
+    qDot3 = 0.5f * (q0 * gy - q1 * gz + q3 * gx);
+    qDot4 = 0.5f * (q0 * gz + q1 * gy - q2 * gx);
+
+    // Compute feedback only if accelerometer measurement valid
+    if (!((ax == 0.0f) && (ay == 0.0f) && (az == 0.0f))) {
+        // Normalise accelerometer measurement
+        recipNorm = 1.0f / sqrtf(ax * ax + ay * ay + az * az);
+        ax *= recipNorm;
+        ay *= recipNorm;
+        az *= recipNorm;
+
+        // Auxiliary variables
+        _2q0 = 2.0f * q0;
+        _2q1 = 2.0f * q1;
+        _2q2 = 2.0f * q2;
+        _2q3 = 2.0f * q3;
+        _4q0 = 4.0f * q0;
+        _4q1 = 4.0f * q1;
+        _4q2 = 4.0f * q2;
+        _8q1 = 8.0f * q1;
+        _8q2 = 8.0f * q2;
+        q0q0 = q0 * q0;
+        q1q1 = q1 * q1;
+        q2q2 = q2 * q2;
+        q3q3 = q3 * q3;
+
+        // Gradient descent corrective step
+        s0 = _4q0 * q2q2 + _2q2 * ax + _4q0 * q1q1 - _2q1 * ay;
+        s1 = _4q1 * q3q3 - _2q3 * ax + 4.0f * q0q0 * q1 - _2q0 * ay - _4q1 + _8q1 * q1q1 + _8q1 * q2q2 + _4q1 * az;
+        s2 = 4.0f * q0q0 * q2 + _2q0 * ax + _4q2 * q3q3 - _2q3 * ay - _4q2 + _8q2 * q1q1 + _8q2 * q2q2 + _4q2 * az;
+        s3 = 4.0f * q1q1 * q3 - _2q1 * ax + 4.0f * q2q2 * q3 - _2q2 * ay;
+        
+        recipNorm = 1.0f / sqrtf(s0 * s0 + s1 * s1 + s2 * s2 + s3 * s3);
+        s0 *= recipNorm;
+        s1 *= recipNorm;
+        s2 *= recipNorm;
+        s3 *= recipNorm;
+
+        // Apply feedback
+        qDot1 -= MADGWICK_BETA * s0;
+        qDot2 -= MADGWICK_BETA * s1;
+        qDot3 -= MADGWICK_BETA * s2;
+        qDot4 -= MADGWICK_BETA * s3;
+    }
+
+    // Integrate
+    q0 += qDot1 * dt;
+    q1 += qDot2 * dt;
+    q2 += qDot3 * dt;
+    q3 += qDot4 * dt;
+
+    // Normalise quaternion
+    recipNorm = 1.0f / sqrtf(q0 * q0 + q1 * q1 + q2 * q2 + q3 * q3);
+    q[0] = q0 * recipNorm;
+    q[1] = q1 * recipNorm;
+    q[2] = q2 * recipNorm;
+    q[3] = q3 * recipNorm;
+}
+
+/**
+ * Convert quaternion to Euler angles (roll, pitch, yaw) in degrees
+ * 
+ * Convention: Aerospace (ZYX rotation order)
+ * - Roll: rotation around X axis
+ * - Pitch: rotation around Y axis  
+ * - Yaw: rotation around Z axis (heading)
+ */
+void quaternionToEuler() {
+    float q0 = q[0], q1 = q[1], q2 = q[2], q3 = q[3];
+    
+    // Roll (x-axis rotation)
+    float sinr_cosp = 2.0f * (q0 * q1 + q2 * q3);
+    float cosr_cosp = 1.0f - 2.0f * (q1 * q1 + q2 * q2);
+    roll = atan2f(sinr_cosp, cosr_cosp) * (180.0f / PI);
+    
+    // Pitch (y-axis rotation)
+    float sinp = 2.0f * (q0 * q2 - q3 * q1);
+    if (fabsf(sinp) >= 1.0f) {
+        pitch = copysignf(90.0f, sinp);  // Use 90 degrees if out of range
+    } else {
+        pitch = asinf(sinp) * (180.0f / PI);
+    }
+    
+    // Yaw (z-axis rotation)
+    float siny_cosp = 2.0f * (q0 * q3 + q1 * q2);
+    float cosy_cosp = 1.0f - 2.0f * (q2 * q2 + q3 * q3);
+    yaw = atan2f(siny_cosp, cosy_cosp) * (180.0f / PI);
+    
+    // Convert yaw to 0-360 range
+    if (yaw < 0) {
+        yaw += 360.0f;
+    }
+}
+
+// =============================================================================
+// CALIBRATION FUNCTIONS
+// =============================================================================
+
+/**
+ * Calibrate gyroscope bias
+ * Device must be completely still during calibration
+ */
+void calibrateGyro(uint16_t numSamples = 1000) {
+    Serial.println("CAL:GYRO:START - Keep device still");
+    
+    float sumX = 0, sumY = 0, sumZ = 0;
+    
+    for (uint16_t i = 0; i < numSamples; i++) {
+        readIMUData();
+        sumX += gyroRaw[0] * gyroScale;
+        sumY += gyroRaw[1] * gyroScale;
+        sumZ += gyroRaw[2] * gyroScale;
+        delay(2);
+    }
+    
+    gyroBias[0] = sumX / numSamples;
+    gyroBias[1] = sumY / numSamples;
+    gyroBias[2] = sumZ / numSamples;
+    
+    statusFlags |= STATUS_GYRO_CAL;
+    Serial.println("CAL:GYRO:DONE");
+    Serial.print("Bias: ");
+    Serial.print(gyroBias[0], 4);
+    Serial.print(", ");
+    Serial.print(gyroBias[1], 4);
+    Serial.print(", ");
+    Serial.println(gyroBias[2], 4);
+}
+
+/**
+ * Calibrate accelerometer bias
+ * Device must be level and still (Z pointing up)
+ */
+void calibrateAccel(uint16_t numSamples = 1000) {
+    Serial.println("CAL:ACC:START - Keep device flat and still");
+    
+    float sumX = 0, sumY = 0, sumZ = 0;
+    
+    for (uint16_t i = 0; i < numSamples; i++) {
+        readIMUData();
+        sumX += accelRaw[0] * accelScale;
+        sumY += accelRaw[1] * accelScale;
+        sumZ += accelRaw[2] * accelScale;
+        delay(2);
+    }
+    
+    accelBias[0] = sumX / numSamples;
+    accelBias[1] = sumY / numSamples;
+    accelBias[2] = (sumZ / numSamples) - 1.0f;  // Subtract 1g (gravity)
+    
+    statusFlags |= STATUS_ACCEL_CAL;
+    Serial.println("CAL:ACC:DONE");
+    Serial.print("Bias: ");
+    Serial.print(accelBias[0], 4);
+    Serial.print(", ");
+    Serial.print(accelBias[1], 4);
+    Serial.print(", ");
+    Serial.println(accelBias[2], 4);
+}
+
+/**
+ * Calibrate magnetometer hard and soft iron
+ * User must rotate device in a figure-8 pattern in all axes
+ * This takes about 30 seconds
+ */
+void calibrateMag() {
+    Serial.println("CAL:MAG:START - Rotate device in figure-8 pattern for 30 seconds");
+    
+    int16_t minX = 32767, maxX = -32768;
+    int16_t minY = 32767, maxY = -32768;
+    int16_t minZ = 32767, maxZ = -32768;
+    
+    uint32_t startTime = millis();
+    while (millis() - startTime < 30000) {
+        if (readMagData()) {
+            if (magRaw[0] < minX) minX = magRaw[0];
+            if (magRaw[0] > maxX) maxX = magRaw[0];
+            if (magRaw[1] < minY) minY = magRaw[1];
+            if (magRaw[1] > maxY) maxY = magRaw[1];
+            if (magRaw[2] < minZ) minZ = magRaw[2];
+            if (magRaw[2] > maxZ) maxZ = magRaw[2];
+        }
+        delay(20);
+        
+        // Progress indicator
+        if ((millis() - startTime) % 5000 == 0) {
+            Serial.print(".");
+        }
+    }
+    Serial.println();
+    
+    // Calculate hard iron offset (center of the ellipsoid)
+    magBias[0] = ((maxX + minX) / 2.0f) * magScale;
+    magBias[1] = ((maxY + minY) / 2.0f) * magScale;
+    magBias[2] = ((maxZ + minZ) / 2.0f) * magScale;
+    
+    // Calculate soft iron scale (normalize to sphere)
+    float rangeX = (maxX - minX) / 2.0f;
+    float rangeY = (maxY - minY) / 2.0f;
+    float rangeZ = (maxZ - minZ) / 2.0f;
+    float avgRange = (rangeX + rangeY + rangeZ) / 3.0f;
+    
+    if (rangeX > 0) magScale_XYZ[0] = avgRange / rangeX;
+    if (rangeY > 0) magScale_XYZ[1] = avgRange / rangeY;
+    if (rangeZ > 0) magScale_XYZ[2] = avgRange / rangeZ;
+    
+    statusFlags |= STATUS_MAG_CAL;
+    Serial.println("CAL:MAG:DONE");
+    Serial.print("Hard iron: ");
+    Serial.print(magBias[0], 2);
+    Serial.print(", ");
+    Serial.print(magBias[1], 2);
+    Serial.print(", ");
+    Serial.println(magBias[2], 2);
+    Serial.print("Soft iron: ");
+    Serial.print(magScale_XYZ[0], 4);
+    Serial.print(", ");
+    Serial.print(magScale_XYZ[1], 4);
+    Serial.print(", ");
+    Serial.println(magScale_XYZ[2], 4);
+}
+
+// =============================================================================
+// OUTPUT FUNCTIONS
+// =============================================================================
+
+/**
+ * Send orientation data in binary format
+ * This is the fastest and most efficient format
+ */
+void sendBinaryPacket() {
+    uint8_t packet[25];
+    uint32_t timestamp = micros();
+    
+    packet[0] = 0xAA;  // Sync byte
+    packet[1] = 0x01;  // Packet type: orientation
+    
+    // Timestamp (4 bytes, little endian)
+    memcpy(&packet[2], &timestamp, 4);
+    
+    // Roll, Pitch, Yaw, Temperature (4 bytes each, IEEE 754 float)
+    memcpy(&packet[6], &roll, 4);
+    memcpy(&packet[10], &pitch, 4);
+    memcpy(&packet[14], &yaw, 4);
+    memcpy(&packet[18], &temperature, 4);
+    
+    // Status flags (2 bytes)
+    memcpy(&packet[22], &statusFlags, 2);
+    
+    // Checksum (XOR of bytes 1-23)
+    uint8_t checksum = 0;
+    for (int i = 1; i < 24; i++) {
+        checksum ^= packet[i];
+    }
+    packet[24] = checksum;
+    
+    Serial.write(packet, 25);
+}
+
+/**
+ * Send orientation data in human-readable text format
+ * Useful for debugging but slower
+ */
+void sendTextPacket() {
+    Serial.print("R:");
+    Serial.print(roll, 2);
+    Serial.print(" P:");
+    Serial.print(pitch, 2);
+    Serial.print(" Y:");
+    Serial.print(yaw, 2);
+    Serial.print(" T:");
+    Serial.print(temperature, 1);
+    Serial.print(" S:0x");
+    Serial.println(statusFlags, HEX);
+}
+
+// =============================================================================
+// COMMAND PROCESSING
+// =============================================================================
+
+/**
+ * Process received commands from RPI
+ */
+void processCommand(const char* cmd) {
+    if (strcmp(cmd, "RST") == 0) {
+        // Reset sensors and fusion
+        Serial.println("CMD:RST");
+        q[0] = 1.0f; q[1] = 0; q[2] = 0; q[3] = 0;
+        initQMI8658C();
+        initAK09918C();
+        
+    } else if (strcmp(cmd, "CAL:ACC") == 0) {
+        calibrateAccel();
+        
+    } else if (strcmp(cmd, "CAL:GYRO") == 0) {
+        calibrateGyro();
+        
+    } else if (strcmp(cmd, "CAL:MAG") == 0) {
+        calibrateMag();
+        
+    } else if (strncmp(cmd, "SET:ODR:", 8) == 0) {
+        int div = atoi(cmd + 8);
+        if (div >= 1 && div <= 255) {
+            outputDivisor = div;
+            Serial.print("CMD:ODR:");
+            Serial.println(outputDivisor);
+        }
+        
+    } else if (strcmp(cmd, "SET:TEXT") == 0) {
+        binaryOutput = false;
+        Serial.println("CMD:TEXT");
+        
+    } else if (strcmp(cmd, "SET:BIN") == 0) {
+        binaryOutput = true;
+        Serial.println("CMD:BIN");
+        
+    } else if (strcmp(cmd, "GET:STATUS") == 0) {
+        Serial.print("STATUS:");
+        Serial.print("IMU="); Serial.print((statusFlags & STATUS_IMU_OK) ? "OK" : "ERR");
+        Serial.print(",MAG="); Serial.print((statusFlags & STATUS_MAG_OK) ? "OK" : "ERR");
+        Serial.print(",FLAGS=0x"); Serial.println(statusFlags, HEX);
+        
+    } else if (strcmp(cmd, "GET:CAL") == 0) {
+        Serial.println("CAL:ACCEL:");
+        Serial.print("  "); Serial.print(accelBias[0], 6);
+        Serial.print(","); Serial.print(accelBias[1], 6);
+        Serial.print(","); Serial.println(accelBias[2], 6);
+        Serial.println("CAL:GYRO:");
+        Serial.print("  "); Serial.print(gyroBias[0], 6);
+        Serial.print(","); Serial.print(gyroBias[1], 6);
+        Serial.print(","); Serial.println(gyroBias[2], 6);
+        Serial.println("CAL:MAG_HARD:");
+        Serial.print("  "); Serial.print(magBias[0], 4);
+        Serial.print(","); Serial.print(magBias[1], 4);
+        Serial.print(","); Serial.println(magBias[2], 4);
+        Serial.println("CAL:MAG_SOFT:");
+        Serial.print("  "); Serial.print(magScale_XYZ[0], 6);
+        Serial.print(","); Serial.print(magScale_XYZ[1], 6);
+        Serial.print(","); Serial.println(magScale_XYZ[2], 6);
+        
+    } else if (strcmp(cmd, "STOP") == 0) {
+        streaming = false;
+        Serial.println("CMD:STOPPED");
+        
+    } else if (strcmp(cmd, "START") == 0) {
+        streaming = true;
+        Serial.println("CMD:STARTED");
+        
+    } else if (strcmp(cmd, "GET:RAW") == 0) {
+        // Debug: output raw sensor values
+        Serial.print("RAW:A=");
+        Serial.print(accelRaw[0]); Serial.print(",");
+        Serial.print(accelRaw[1]); Serial.print(",");
+        Serial.print(accelRaw[2]); Serial.print(" G=");
+        Serial.print(gyroRaw[0]); Serial.print(",");
+        Serial.print(gyroRaw[1]); Serial.print(",");
+        Serial.print(gyroRaw[2]); Serial.print(" M=");
+        Serial.print(magRaw[0]); Serial.print(",");
+        Serial.print(magRaw[1]); Serial.print(",");
+        Serial.println(magRaw[2]);
+        
+    } else {
+        Serial.print("ERR:UNKNOWN:");
+        Serial.println(cmd);
+    }
+}
+
+/**
+ * Check for and process incoming serial commands
+ * Non-blocking - reads available characters and processes complete lines
+ */
+void checkCommands() {
+    while (Serial.available()) {
+        char c = Serial.read();
+        
+        if (c == '\n' || c == '\r') {
+            if (cmdIndex > 0) {
+                cmdBuffer[cmdIndex] = '\0';
+                processCommand(cmdBuffer);
+                cmdIndex = 0;
+            }
+        } else if (cmdIndex < CMD_BUFFER_SIZE - 1) {
+            cmdBuffer[cmdIndex++] = c;
+        }
+    }
+}
+
+// =============================================================================
+// SETUP
+// =============================================================================
+
+void setup() {
+    // Initialize serial
+    Serial.begin(SERIAL_BAUD);
+    while (!Serial && millis() < 3000);  // Wait up to 3 seconds for serial
+    
+    Serial.println();
+    Serial.println("========================================");
+    Serial.println("QMI8658C + AK09918C IMU Driver");
+    Serial.println("========================================");
+    
+    // Initialize I2C
+    Wire.begin(I2C_SDA, I2C_SCL);
+    Wire.setClock(I2C_FREQ);
+    
+    // Initialize sensors
+    Serial.println("Initializing QMI8658C...");
+    if (!initQMI8658C()) {
+        Serial.println("FATAL: QMI8658C initialization failed!");
+    } else {
+        Serial.println("QMI8658C OK");
+    }
+    
+    Serial.println("Initializing AK09918C...");
+    if (!initAK09918C()) {
+        Serial.println("WARNING: AK09918C initialization failed!");
+        Serial.println("Yaw will drift without magnetometer!");
+    } else {
+        Serial.println("AK09918C OK");
+    }
+    
+    // Quick gyro calibration on startup
+    Serial.println("Auto-calibrating gyro (keep still)...");
+    calibrateGyro(500);
+    
+    Serial.println();
+    Serial.println("Ready! Streaming data...");
+    Serial.print("Baud rate: ");
+    Serial.println(SERIAL_BAUD);
+    Serial.print("Output mode: ");
+    Serial.println(binaryOutput ? "BINARY" : "TEXT");
+    Serial.println("Send 'SET:TEXT' for human-readable output");
+    Serial.println("========================================");
+    Serial.println();
+    
+    lastUpdateMicros = micros();
+}
+
+// =============================================================================
+// MAIN LOOP
+// =============================================================================
+
+void loop() {
+    // Check for commands (non-blocking)
+    checkCommands();
+    
+    // Read IMU data
+    if (readIMUData()) {
+        // Calculate dt
+        uint32_t now = micros();
+        float dt = (now - lastUpdateMicros) / 1000000.0f;
+        lastUpdateMicros = now;
+        
+        // Clamp dt to reasonable range
+        if (dt <= 0 || dt > 0.1f) {
+            dt = samplePeriod;
+        }
+        
+        // Read magnetometer (may not have new data every cycle)
+        bool magValid = readMagData();
+        
+        // Update filter
+        if (magValid && (statusFlags & STATUS_MAG_OK)) {
+            // Full 9-DOF fusion with magnetometer (best for yaw)
+            madgwickUpdate(gyro[0], gyro[1], gyro[2],
+                          accel[0], accel[1], accel[2],
+                          mag[0], mag[1], mag[2],
+                          dt);
+        } else {
+            // 6-DOF fusion without magnetometer (yaw will drift!)
+            madgwickUpdate6DOF(gyro[0], gyro[1], gyro[2],
+                              accel[0], accel[1], accel[2],
+                              dt);
+        }
+        
+        // Convert quaternion to Euler angles
+        quaternionToEuler();
+        
+        // Output data (if streaming enabled and divisor reached)
+        if (streaming) {
+            sampleCounter++;
+            if (sampleCounter >= outputDivisor) {
+                sampleCounter = 0;
+                
+                if (binaryOutput) {
+                    sendBinaryPacket();
+                } else {
+                    sendTextPacket();
+                }
+            }
+        }
+    }
+}

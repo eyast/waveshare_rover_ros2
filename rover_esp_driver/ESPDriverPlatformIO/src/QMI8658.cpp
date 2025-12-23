@@ -478,7 +478,7 @@ unsigned char QMI8658::begin(void)
 	}
 	else
 	{
-		// Serial.print("qmi8658_init fail\n");
+		Serial.print("qmi8658_init fail\n");
 		return 0;
 	}
 }
