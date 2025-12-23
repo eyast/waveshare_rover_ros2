@@ -6,6 +6,7 @@
 #include "madgwick.h"
 #include "motioncal_output.h"
 #include "mag_calibration.h"
+#include "hardcoded_calibration.h"
 
 // =============================================================================
 // QMI8658C + AK09918C IMU Driver - MotionCal Compatible
@@ -128,7 +129,13 @@ void setup() {
         imu.calibrate_gyro();
     }
 
-    // Load magnetometer calibration from NVS if available
+    // Apply hardcoded magnetometer calibration first
+    // (can be disabled by setting USE_HARDCODED_CALIBRATION to false)
+    if (mag_ok) {
+        apply_hardcoded_calibration(mag);
+    }
+
+    // Load magnetometer calibration from NVS if available (overrides hardcoded)
     if (cal_receiver.load_from_nvs()) {
         apply_calibration();
     }
@@ -212,6 +219,8 @@ void loop() {
             mag_data.mag_raw[1] * 0.15f,
             mag_data.mag_raw[2] * 0.15f
         };
+
+        // Uncalibratd data
         motioncal_send_raw(
             imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
             imu_data.gyro_dps[0], imu_data.gyro_dps[1], imu_data.gyro_dps[2],
@@ -221,6 +230,7 @@ void loop() {
         // Send unified data in physical units (for debugging)
         // Format: "Uni:ax,ay,az,gx,gy,gz,mx,my,mz"
         // Units: accel in m/s², gyro in rad/s, mag in uT
+        // If a hardcording calibrator exists, this sends calibrated data
         motioncal_send_unified(
             imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
             imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
@@ -229,10 +239,10 @@ void loop() {
 
         // Send orientation computed by our calibrated Madgwick filter
         // This provides stable yaw/pitch/roll in MotionCal
-        // motioncal_send_orientation(
-        //     filter.get_yaw(),
-        //     filter.get_pitch(),
-        //     filter.get_roll()
-        // );
+        motioncal_send_orientation(
+            filter.get_yaw(),
+            filter.get_pitch(),
+            filter.get_roll()
+        );
     }
 }

@@ -18,6 +18,9 @@ JsonDocument jsonInfoHttp;
 #include "IMU_ctrl.h"
 #include "motors.h"
 
+// Sensor status
+bool imu_ok = false;
+bool mag_ok = false;
 
 void setup() {
     Serial.begin(115200);
@@ -43,6 +46,7 @@ void setup() {
     oled_update();
     delay(1000);
     imu_init();
+
 
 }
 

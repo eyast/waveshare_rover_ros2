@@ -21,7 +21,7 @@ from typing import Optional
 
 @dataclass
 class Config:
-    serial_port: str = "/dev/cu.usbserial-10"
+    serial_port: str = "/dev/cu.usbserial-110"
     baud_rate: int = 115200
     command_interval: float = 0.2
     window_width: int = 1600
