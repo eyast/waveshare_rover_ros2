@@ -1,0 +1,200 @@
+# MotionCal Python
+
+Python port of Paul Stoffregen's [MotionCal](https://www.pjrc.com/store/prop_shield.html) sensor calibration tool.
+
+## Overview
+
+MotionCal is a motion sensor calibration application for IMU (Inertial Measurement Unit) sensors. It calibrates magnetometers, accelerometers, and gyroscopes using sophisticated algorithms from NXP/Freescale.
+
+This Python port maintains all functionality of the original C++ application without optimization or alteration, ensuring exact compatibility with the calibration data format.
+
+## Implementation Status
+
+**✅ COMPLETE** - All phases implemented and ready for use!
+
+- ✅ Phase 1-2: Core calibration algorithms
+- ✅ Phase 3: Mahony AHRS sensor fusion
+- ✅ Phase 4: OpenGL 3D visualization
+- ✅ Phase 5: Complete PyQt6 GUI with serial communication
+- ✅ Phase 6: Unit tests and documentation
+
+## Features
+
+- **Magnetic Calibration**: Three algorithms (4/7/10 element) for hard iron and soft iron correction
+- **Quality Metrics**: Real-time feedback on calibration quality (gaps, variance, wobble, fit error)
+- **3D Visualization**: OpenGL sphere display showing magnetometer coverage
+- **Sensor Fusion**: Mahony AHRS 9-DOF algorithm for orientation
+- **Serial Communication**: Compatible with any device sending ASCII protocol data
+- **Real-time Display**: Live sensor readings and orientation
+
+## Installation
+
+### Requirements
+
+- Python 3.8 or higher
+- PyQt6, PyOpenGL, NumPy, SciPy, pyserial
+
+### Install from source
+
+```bash
+cd Python
+pip install -e .
+```
+
+Or for production:
+
+```bash
+pip install .
+```
+
+## Usage
+
+Launch the application:
+
+```bash
+motioncal
+```
+
+### Calibration Process
+
+1. **Connect your sensor** via serial port
+2. **Select port settings**:
+   - Choose the correct serial port
+   - Set baud rate (typically 115200)
+   - Set line ending (typically LF or CRLF)
+3. **Rotate the sensor slowly** in all orientations:
+   - Cover the full sphere (all directions)
+   - Approximately 1 revolution per 3 seconds
+   - Continue until quality metrics turn green
+4. **Send calibration** when the "Send Calibration" button becomes enabled:
+   - Gaps < 15%
+   - Variance < 4.5%
+   - Wobble < 4.0%
+   - Fit Error < 5.0%
+5. **Verify** the green checkmark appears, confirming the device received the calibration
+
+## Supported Hardware
+
+MotionCal works with any IMU device that sends data in the ASCII protocol format:
+
+```
+Raw:ax,ay,az,gx,gy,gz,mx,my,mz\r\n
+```
+
+Where values are int16 raw sensor counts.
+
+**Tested devices:**
+- Teensy with Prop Shield
+- ESP32 with MPU9250
+- ESP32 with LSM9DS1
+- ESP32 with QMI8658C + AK09918C (see `yourwork/main.cpp`)
+
+## Data Format
+
+### Input (ASCII Protocol)
+
+The device should send raw sensor data:
+- `Raw:ax,ay,az,gx,gy,gz,mx,my,mz\r` - 9 int16 values (comma-separated)
+
+Optional calibration echo:
+- `Cal1:ax,ay,az,mx,my,mz,s00,s01,s02,s10\r` - 10 floats
+- `Cal2:s11,s12,s20,s21,s22,field,wobble,variance,gaps\r` - 9 floats
+
+### Output (Binary Calibration)
+
+MotionCal sends a 68-byte binary calibration packet:
+- Signature: `[117, 84]` ('u', 'T')
+- Accelerometer offsets: 3 × float32 (currently all zeros)
+- Gyroscope offsets: 3 × float32 (currently all zeros)
+- Magnetometer hard iron offset: 3 × float32 (µT)
+- Magnetic field strength: 1 × float32 (µT)
+- Soft iron matrix: 6 × float32 (symmetric 3×3 matrix)
+- CRC16 checksum: 2 bytes
+
+## Scale Factors
+
+- **Accelerometer**: 1/8192 G per count (0.0001220703125)
+- **Gyroscope**: 1/16 deg/sec per count (0.0625)
+- **Magnetometer**: 0.1 µT per count
+
+## Differences from C++ Version
+
+- **UI Framework**: wxWidgets → PyQt6
+- **Language**: C++ → Python 3.8+
+- **Removed**: Binary packet protocol (0x7E framing) - ASCII only
+- **Preserved**: All calibration algorithms, quality metrics, data formats
+
+## Development
+
+### Running Tests
+
+```bash
+pytest tests/
+```
+
+### Project Structure
+
+```
+Python/
+├── motioncal/
+│   ├── calibration/     # Calibration algorithms (magcal, quality, matrix)
+│   ├── data/            # Data structures and processing
+│   ├── fusion/          # Sensor fusion (Mahony, NXP Kalman)
+│   ├── gui/             # PyQt6 user interface
+│   ├── serial/          # Serial communication and protocol
+│   ├── utils/           # Constants, logging, CRC
+│   └── visualization/   # OpenGL 3D rendering
+└── tests/               # Unit tests
+```
+
+## Troubleshooting
+
+### Serial Port Not Listed
+
+**Linux**: Add user to dialout group
+```bash
+sudo usermod -a -G dialout $USER
+```
+Then log out and log back in.
+
+**Windows**: Install CH340/CP2102 USB-serial drivers
+
+**macOS**: Check `/dev/cu.*` permissions
+
+### Calibration Not Converging
+
+- Rotate sensor **slowly** (1 revolution per 3 seconds)
+- Cover **all orientations** (full sphere coverage)
+- Avoid **magnetic interference** (motors, magnets, steel desks)
+- Keep sensor away from computer and metal objects
+
+### OpenGL Errors
+
+**Linux**:
+```bash
+sudo apt install libgl1-mesa-dev libglu1-mesa-dev
+```
+
+**All platforms**: Update graphics drivers to latest version
+
+### CRC Mismatch
+
+- Verify **line ending** setting matches device output
+- Verify **baud rate** matches device configuration
+- Check for **serial buffer overruns**
+
+## License
+
+BSD-3-Clause (matching original MotionCal)
+
+## Credits
+
+- Original MotionCal: Paul Stoffregen (PJRC)
+- Calibration Algorithms: NXP/Freescale Semiconductor
+- Python Port: 2025
+
+## References
+
+- [Original MotionCal](https://www.pjrc.com/store/prop_shield.html)
+- [PJRC GitHub](https://github.com/PaulStoffregen/MotionCal)
+- [NXP Sensor Fusion](https://www.nxp.com/design/software/sensor-toolbox:SENSOR-TOOLBOX)

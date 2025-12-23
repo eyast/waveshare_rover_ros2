@@ -1,0 +1,5 @@
+[console_scripts]
+motioncal = motioncal.__main__:main
+
+[gui_scripts]
+motioncal-gui = motioncal.__main__:main

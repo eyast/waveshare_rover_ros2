@@ -287,7 +287,9 @@ int ascii_parse(const unsigned char *data, int len)
 				ascii_num = 0;
 				ascii_neg = 0;
 				ascii_count = 0;
-			} else if (*p == 13) {
+			} else if (*p == 13 || *p == 0) {
+				// Accept CR (13) or null terminator (0) as line ending
+				// Null terminator needed because read_serial_data strips line endings
 				if (ascii_neg) ascii_num = -ascii_num;
 				if (ascii_num < -32768 || ascii_num > 32767) goto fail;
 				if (ascii_raw_data_count != 8) goto fail;
@@ -331,7 +333,8 @@ int ascii_parse(const unsigned char *data, int len)
 				ascii_num = 0;
 				ascii_neg = 0;
 				ascii_count = 0;
-			} else if (*p == 13) {
+			} else if (*p == 13 || *p == 0) {
+				// Accept CR (13) or null terminator (0) as line ending
 				//printf("ascii_parse newline\n");
 				if ((ascii_state == ASCII_STATE_CAL1 && ascii_raw_data_count != 9)
 				 || (ascii_state == ASCII_STATE_CAL2 && ascii_raw_data_count != 8))

@@ -100,8 +100,9 @@ void sendDataCallback(const unsigned char *data, int len)
     buffer[len] = '\0'; // null-terminate
     if (memcmp(buffer, "Raw", 3) == 0)
     {
-        char *token = strtok(buffer, " \r\n"); // "Raw"
-        token = strtok(NULL, " \r\n");         // CSV part
+        // Accept "Raw:" or "Raw " as prefix
+        char *token = strtok(buffer, ": \r\n"); // "Raw"
+        token = strtok(NULL, " \r\n");          // CSV part
 
         if (!token) {
             logMessage("Malformed Raw data: no CSV payload");
@@ -109,42 +110,57 @@ void sendDataCallback(const unsigned char *data, int len)
         }
 
         ImuData imuData;
+        int16_t raw_values[9];
+        int idx = 0;
+
         char *val = strtok(token, ",");
         if (!val) { logMessage("Missing accel.x"); return; }
         imuData.accelerometer.x = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.accelerometer.x;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing accel.y"); return; }
         imuData.accelerometer.y = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.accelerometer.y;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing accel.z"); return; }
         imuData.accelerometer.z = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.accelerometer.z;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing gyro.x"); return; }
         imuData.gyroscope.x = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.gyroscope.x;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing gyro.y"); return; }
         imuData.gyroscope.y = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.gyroscope.y;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing gyro.z"); return; }
         imuData.gyroscope.z = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.gyroscope.z;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing mag.x"); return; }
         imuData.magnetometer.x = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.magnetometer.x;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing mag.y"); return; }
         imuData.magnetometer.y = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.magnetometer.y;
 
         val = strtok(NULL, ",");
         if (!val) { logMessage("Missing mag.z"); return; }
         imuData.magnetometer.z = strtof(val, NULL);
+        raw_values[idx++] = (int16_t)imuData.magnetometer.z;
+
         fireImuCallback(imuData);
+        // Also call raw_data to populate the calibration sphere
+        raw_data(raw_values);
     }
     else if (memcmp(buffer, "Ori", 3) == 0)
     {
