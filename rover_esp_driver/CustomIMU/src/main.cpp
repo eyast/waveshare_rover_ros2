@@ -5,6 +5,7 @@
 #include "ak09918c.h"
 #include "madgwick.h"
 #include "motioncal_output.h"
+#include "mag_calibration.h"
 
 // =============================================================================
 // QMI8658C + AK09918C IMU Driver - MotionCal Compatible
@@ -20,6 +21,9 @@ QMI8658C imu(QMI8658C_ADDR);
 AK09918C mag(AK09918C_ADDR);
 MadgwickFilter filter(MADGWICK_BETA);
 
+// Calibration receiver
+MagCalibrationReceiver cal_receiver;
+
 // Timing
 uint32_t last_output_ms = 0;
 uint32_t last_update_us = 0;
@@ -32,32 +36,52 @@ bool mag_ok = false;
 // Serial Command Processing
 // =============================================================================
 
-void process_serial_commands() {
+// Helper function to apply calibration to magnetometer
+void apply_calibration() {
+    const MagCalibration& cal = cal_receiver.get_calibration();
+    if (cal.valid) {
+        mag.set_hard_iron(cal.hard_iron[0], cal.hard_iron[1], cal.hard_iron[2]);
+        mag.set_soft_iron(cal.soft_iron);
+        Serial.println("Calibration applied to magnetometer");
+    }
+}
+
+void process_serial_data() {
     static char cmd_buf[64];
     static uint8_t cmd_idx = 0;
 
     while (Serial.available()) {
-        char c = Serial.read();
+        uint8_t c = Serial.read();
 
+        // Try to process as binary calibration packet
+        if (cal_receiver.process_byte(c)) {
+            // Calibration received! Save and apply it
+            cal_receiver.save_to_nvs();
+            apply_calibration();
+            cmd_idx = 0;  // Reset text command buffer
+            continue;
+        }
+
+        // Process as text command
         if (c == '\n' || c == '\r') {
             if (cmd_idx > 0) {
                 cmd_buf[cmd_idx] = '\0';
 
-                // Process MotionCal calibration commands
-                if (strncmp(cmd_buf, "Cal1:", 5) == 0) {
-                    // Parse Cal1 data from MotionCal
-                    // Format: Cal1:ax,ay,az,mx,my,mz,s00,s01,s02,s10
-                    Serial.println("Cal1 received");
-                } else if (strncmp(cmd_buf, "Cal2:", 5) == 0) {
-                    // Parse Cal2 data from MotionCal
-                    Serial.println("Cal2 received");
-                } else if (strcmp(cmd_buf, "RECAL") == 0) {
+                if (strcmp(cmd_buf, "RECAL") == 0) {
                     // Re-calibrate gyro
                     imu.calibrate_gyro();
                 } else if (strcmp(cmd_buf, "RESET") == 0) {
                     // Reset orientation filter
                     filter.reset();
                     Serial.println("Filter reset");
+                } else if (strcmp(cmd_buf, "CALINFO") == 0) {
+                    // Print current calibration
+                    cal_receiver.print_calibration();
+                } else if (strcmp(cmd_buf, "LOADCAL") == 0) {
+                    // Load calibration from NVS
+                    if (cal_receiver.load_from_nvs()) {
+                        apply_calibration();
+                    }
                 }
 
                 cmd_idx = 0;
@@ -104,8 +128,13 @@ void setup() {
         imu.calibrate_gyro();
     }
 
+    // Load magnetometer calibration from NVS if available
+    if (cal_receiver.load_from_nvs()) {
+        apply_calibration();
+    }
+
     Serial.println("\nStreaming data for MotionCal...\n");
-    Serial.println("Commands: RECAL (recalibrate gyro), RESET (reset filter)\n");
+    Serial.println("Commands: RECAL, RESET, CALINFO, LOADCAL\n");
 
     last_update_us = micros();
     last_output_ms = millis();
@@ -116,8 +145,8 @@ void setup() {
 // =============================================================================
 
 void loop() {
-    // Process any incoming serial commands
-    process_serial_commands();
+    // Process any incoming serial data (commands + calibration)
+    process_serial_data();
 
     // Read sensors
     bool imu_read_ok = imu.read();
@@ -176,18 +205,34 @@ void loop() {
         //   - accel in g
         //   - gyro in dps (degrees per second)
         //   - mag in uT (microtesla)
+        // IMPORTANT: Send RAW magnetometer data (not calibrated) for MotionCal calibration
+        // AK09918C scale is 0.15 uT/LSB
+        float mag_raw_ut[3] = {
+            mag_data.mag_raw[0] * 0.15f,
+            mag_data.mag_raw[1] * 0.15f,
+            mag_data.mag_raw[2] * 0.15f
+        };
         motioncal_send_raw(
             imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
             imu_data.gyro_dps[0], imu_data.gyro_dps[1], imu_data.gyro_dps[2],
+            mag_raw_ut[0], mag_raw_ut[1], mag_raw_ut[2]
+        );
+
+        // Send unified data in physical units (for debugging)
+        // Format: "Uni:ax,ay,az,gx,gy,gz,mx,my,mz"
+        // Units: accel in m/s², gyro in rad/s, mag in uT
+        motioncal_send_unified(
+            imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+            imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
             mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
         );
 
-        // Note: motioncal_send_unified() removed - MotionCal doesn't recognize "Uni:" format
-        // Uncomment for debugging if needed (will show as "Unknown Message" in MotionCal):
-        // motioncal_send_unified(
-        //     imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
-        //     imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
-        //     mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
+        // Send orientation computed by our calibrated Madgwick filter
+        // This provides stable yaw/pitch/roll in MotionCal
+        // motioncal_send_orientation(
+        //     filter.get_yaw(),
+        //     filter.get_pitch(),
+        //     filter.get_roll()
         // );
     }
 }

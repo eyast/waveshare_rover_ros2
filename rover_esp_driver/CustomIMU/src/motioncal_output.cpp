@@ -144,3 +144,14 @@ void motioncal_send_mag_cal(int16_t id, int16_t x, int16_t y, int16_t z) {
     }
     Serial.write(0x7E);
 }
+
+void motioncal_send_orientation(float yaw, float pitch, float roll) {
+    // Format: "Ori: yaw,pitch,roll\n"
+    // MotionCal uses strtok with " \r\n" delimiters, expects space after "Ori"
+    Serial.print("Ori: ");
+    Serial.print(yaw, 2);
+    Serial.print(",");
+    Serial.print(pitch, 2);
+    Serial.print(",");
+    Serial.println(roll, 2);
+}

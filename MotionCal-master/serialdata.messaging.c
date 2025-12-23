@@ -164,8 +164,9 @@ void sendDataCallback(const unsigned char *data, int len)
     }
     else if (memcmp(buffer, "Ori", 3) == 0)
     {
-        char *token = strtok(buffer, " \r\n"); // "Ori"
-        token = strtok(NULL, " \r\n");         // CSV part
+        // Accept "Ori:" or "Ori " as prefix
+        char *token = strtok(buffer, ": \r\n"); // "Ori"
+        token = strtok(NULL, " \r\n");          // CSV part
 
         if (!token) {
             logMessage("Malformed Ori data: no CSV payload");

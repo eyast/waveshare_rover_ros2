@@ -58,4 +58,8 @@ void motioncal_send_quaternion(const float q[4]);
 // Send magnetic calibration data packet
 void motioncal_send_mag_cal(int16_t id, int16_t x, int16_t y, int16_t z);
 
+// Send orientation in MotionCal ASCII format
+// Format: "Ori: yaw,pitch,roll\n" (angles in degrees)
+void motioncal_send_orientation(float yaw, float pitch, float roll);
+
 #endif // MOTIONCAL_OUTPUT_H
