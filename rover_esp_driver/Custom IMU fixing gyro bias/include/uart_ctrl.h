@@ -403,6 +403,40 @@ void jsonCmdReceiveHandler() {
     case CMD_MM_TYPE_SET:
         mm_settings(jsonCmdReceive["main"], jsonCmdReceive["module"]);
         break;
+
+    // --- WIFI and WebSockets ----
+    // note: lower case 'ssid' and 'pass'
+    case CMD_WIFI:
+        if (jsonCmdReceive.containsKey("ssid") && jsonCmdReceive.containsKey("pass")) {
+            wifiSSID = jsonCmdReceive["ssid"].as<String>();
+            wifiPassword = jsonCmdReceive["pass"].as<String>();
+            connectWiFi();
+        }
+        break;
+
+    // {"T": 501, "server": "abc", "port": "password"}
+    case CMD_SERVER:
+        if (jsonCmdReceive.containsKey("server") && jsonCmdReceive.containsKey("port")) {
+            serverIP = jsonCmdReceive["server"].as<String>();
+            serverPort = jsonCmdReceive["port"].as<uint16_t>();
+            connectWebSocket();
+        }
+        break;
+
+    // {"T": 502}
+    case WS_STATUS:
+        wsStatus();
+        break;
+
+    //  {"T": 503}
+    case WS_START:
+        wssendingEnabled = true;
+        break;
+
+    //  {"T": 504}
+    case WS_STOP:
+        wssendingEnabled = false;
+        break;
     }
 }
 

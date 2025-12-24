@@ -1,4 +1,5 @@
 #include "motioncal_output.h"
+#include "websockets.h"
 
 // Helper: Send a byte with 0x7D escape encoding if needed
 static void send_encoded_byte(uint8_t b) {
@@ -35,17 +36,30 @@ void motioncal_send_raw(float ax, float ay, float az,
     int mag_z = (int)(mz * MOTIONCAL_MAG_SCALE);
 
     // Format: "Raw:ax,ay,az,gx,gy,gz,mx,my,mz\n"
-    Serial.print("Raw:");
-    Serial.print(accel_x); Serial.print(",");
-    Serial.print(accel_y); Serial.print(",");
-    Serial.print(accel_z); Serial.print(",");
-    Serial.print(gyro_x); Serial.print(",");
-    Serial.print(gyro_y); Serial.print(",");
-    Serial.print(gyro_z); Serial.print(",");
-    Serial.print(mag_x); Serial.print(",");
-    Serial.print(mag_y); Serial.print(",");
-    Serial.println(mag_z);
+//     Serial.print("Raw:");
+//     Serial.print(accel_x); Serial.print(",");
+//     Serial.print(accel_y); Serial.print(",");
+//     Serial.print(accel_z); Serial.print(",");
+//     Serial.print(gyro_x); Serial.print(",");
+//     Serial.print(gyro_y); Serial.print(",");
+//     Serial.print(gyro_z); Serial.print(",");
+//     Serial.print(mag_x); Serial.print(",");
+//     Serial.print(mag_y); Serial.print(",");
+//     Serial.println(mag_z);
+// }
+    Out.print("Raw:");
+    Out.print(accel_x); Out.print(",");
+    Out.print(accel_y); Out.print(",");
+    Out.print(accel_z); Out.print(",");
+    Out.print(gyro_x); Out.print(",");
+    Out.print(gyro_y); Out.print(",");
+    Out.print(gyro_z); Out.print(",");
+    Out.print(mag_x); Out.print(",");
+    Out.print(mag_y); Out.print(",");
+    Out.println(mag_z);
 }
+
+
 
 void motioncal_send_raw(const float accel[3],
                         const float gyro[3],
@@ -148,10 +162,17 @@ void motioncal_send_mag_cal(int16_t id, int16_t x, int16_t y, int16_t z) {
 void motioncal_send_orientation(float yaw, float pitch, float roll) {
     // Format: "Ori: yaw,pitch,roll\n"
     // MotionCal uses strtok with " \r\n" delimiters, expects space after "Ori"
-    Serial.print("Ori: ");
-    Serial.print(yaw, 2);
-    Serial.print(",");
-    Serial.print(pitch, 2);
-    Serial.print(",");
-    Serial.println(roll, 2);
+    // Serial.print("Ori: ");
+    // Serial.print(yaw, 2);
+    // Serial.print(",");
+    // Serial.print(pitch, 2);
+    // Serial.print(",");
+    // Serial.println(roll, 2);
+    Out.print("Ori: ");
+    Out.print(yaw, 2);
+    Out.print(",");
+    Out.print(pitch, 2);
+    Out.print(",");
+    Out.println(roll, 2);
+
 }

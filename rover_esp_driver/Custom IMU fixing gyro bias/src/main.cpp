@@ -14,7 +14,10 @@
 // Libraries
 // -----------------------------------------------------------------------------
 #include <Arduino.h>
+#include <WiFi.h>
+#include <WebSocketsClient.h>
 #include <ArduinoJson.h>
+#include "websockets.h"
 JsonDocument jsonCmdReceive;
 JsonDocument jsonInfoSend;
 JsonDocument jsonInfoHttp;
@@ -226,6 +229,7 @@ void setup() {
 // =============================================================================
 void loop() {
     serialCtrl();
+    webSocket.loop();
     updateIMUFilter();
     sendIMUStreamData();
     oledInfoUpdate();
