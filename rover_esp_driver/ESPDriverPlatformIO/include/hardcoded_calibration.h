@@ -11,24 +11,24 @@
 // =============================================================================
 
 // Hard iron offsets (uT) - compensates for permanent magnetic fields
-#define HARDCODED_MAG_OFFSET_X  25.99f
-#define HARDCODED_MAG_OFFSET_Y -56.78f
-#define HARDCODED_MAG_OFFSET_Z -27.08f
+#define HARDCODED_MAG_OFFSET_X  25.15f
+#define HARDCODED_MAG_OFFSET_Y -56.42f
+#define HARDCODED_MAG_OFFSET_Z -27.62f
 
 // Soft iron matrix - compensates for magnetic field distortion
 // This is a symmetric 3x3 matrix
-#define HARDCODED_SOFT_IRON_00  1.040f
-#define HARDCODED_SOFT_IRON_01  0.014f
-#define HARDCODED_SOFT_IRON_02 -0.068f
-#define HARDCODED_SOFT_IRON_10  0.014f  // Same as 01 (symmetric)
-#define HARDCODED_SOFT_IRON_11  1.064f
-#define HARDCODED_SOFT_IRON_12  0.004f
-#define HARDCODED_SOFT_IRON_20 -0.068f  // Same as 02 (symmetric)
-#define HARDCODED_SOFT_IRON_21  0.004f  // Same as 12 (symmetric)
-#define HARDCODED_SOFT_IRON_22  0.908f
+#define HARDCODED_SOFT_IRON_00  1.039f
+#define HARDCODED_SOFT_IRON_01  0.013f
+#define HARDCODED_SOFT_IRON_02 -0.061f
+#define HARDCODED_SOFT_IRON_10  0.013f  // Same as 01 (symmetric)
+#define HARDCODED_SOFT_IRON_11  1.061f
+#define HARDCODED_SOFT_IRON_12  0.003f
+#define HARDCODED_SOFT_IRON_20 -0.061f  // Same as 02 (symmetric)
+#define HARDCODED_SOFT_IRON_21  0.003f  // Same as 12 (symmetric)
+#define HARDCODED_SOFT_IRON_22  0.911f
 
 // Expected magnetic field strength (uT)
-#define HARDCODED_FIELD_STRENGTH 56.42f
+#define HARDCODED_FIELD_STRENGTH 56.17f
 
 // =============================================================================
 // Function to apply hardcoded calibration
