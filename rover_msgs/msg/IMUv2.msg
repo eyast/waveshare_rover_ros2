@@ -6,9 +6,9 @@ float32 yaw
 float32 ax
 float32 ay
 float32 az
-int32 gx
-int32 gy
-int32 gz
+float32 gx
+float32 gy
+float32 gz
 float32 mx
 float32 my
 float32 mz

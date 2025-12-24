@@ -133,11 +133,11 @@ class CommandType(IntEnum):
     # =========================================================================
     # MEssage Format
     # =========================================================================
-    IMU_TYPE = 600
+    IMU_TYPE = 400
     """
-    Reboot the ESP32.
+    Sets the IMU stream format.
     
-    Format: {"T":600}
+    Format: {"T":325, "cmd":1}
     """
 
 class ModuleType(IntEnum):

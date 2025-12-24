@@ -7,7 +7,7 @@ These are pure Python dataclasses with no ROS2 dependencies.
 """
 
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 @dataclass
@@ -63,6 +63,27 @@ class IMUData_v2:
             mz=data["m"][2],
         )
 
+    @classmethod
+    def from_list(cls, data: List[float]) -> 'IMUData_v2':
+        """
+        Create IMUData from a list of 9 ordered values.
+        
+        Expected order: [ax, ay, az, gx, gy, gz, mx, my, mz]
+        
+        Note: roll, pitch, yaw will default to 0.0 since they're
+        not included in the 9-element raw sensor data.
+        """
+        return cls(
+            ax=data[0],
+            ay=data[1],
+            az=data[2],
+            gx=data[3],
+            gy=data[4],
+            gz=data[5],
+            mx=int(data[6]),
+            my=int(data[7]),
+            mz=int(data[8]),
+        )
 
 @dataclass 
 class ChassisInfo:

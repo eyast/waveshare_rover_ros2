@@ -243,6 +243,23 @@ class PyRover:
         
         self._ser.write(data.encode() + b'\n') #type: ignore
 
+
+    # =========================================================================
+    # Motion Control
+    # =========================================================================
+    
+    def set_imu_stream(self, mode) -> None:
+        """
+        Sets the format IMU data is streamed.
+        0 - raw
+        1 - 
+        """
+
+        self.send_command({
+            "T": CommandType.IMU_TYPE,
+            "cmd": 1 if mode else 0
+        })
+
     # =========================================================================
     # Motion Control
     # =========================================================================

@@ -9,7 +9,7 @@ from pyrover import IMUData_v2, ChassisInfo
 from rover_msgs.msg import IMUv2, Temperature, Battery, Wheel
 
 
-def to_ros_msg(ros_node, data) -> IMUv2:
+def to_ros_msg(ros_node, data: IMUData_v2) -> IMUv2:
     """Transforms a custom data type to the appropriapte
     ROS2 message type.
     
@@ -37,3 +37,4 @@ def to_ros_msg(ros_node, data) -> IMUv2:
         return msg
     except Exception as e:
         ros_node.get_logger().debug(f"Transforming IMUv2 class to ros message failed:{e}")
+    return IMUv2()

@@ -145,7 +145,7 @@ class RoverController(Node):
                 callback=self._esp_callback # type: ignore
             )
             self.rover.connect()
-            self.rover.send_raw('{"T":325, 1}')
+            self.rover.set_imu_stream(True)
             self.get_logger().info(f"Connected to PyRover on {self.port}")
         except Exception as e:
             self.get_logger().error(f"Failed to connect: {e}")
