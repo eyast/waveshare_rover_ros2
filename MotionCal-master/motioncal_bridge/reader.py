@@ -21,7 +21,8 @@ def main():
         description="Read from a serial port (real or virtual)"
     )
     parser.add_argument(
-        "device",
+        "--device",
+        default='/dev/ttys214',
         help="Serial device path (e.g., /dev/ttys001)"
     )
     parser.add_argument(
