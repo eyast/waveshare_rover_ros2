@@ -39,7 +39,7 @@
 #define ODR_SEL 3 //6
 
 // Magnetometer scale factor (AK09918C)
-#define MAG_SCALE 0.15f  // uT/LSB
+#define MAG_SCALE 0.5f  // uT/LSB
 
 // =============================================================================
 // Output Configuration

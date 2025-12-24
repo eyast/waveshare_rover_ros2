@@ -14,6 +14,8 @@ import queue
 import time
 import math
 import numpy as np
+import pandas as pd
+from datetime import datetime
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Optional, List, Tuple
@@ -210,7 +212,7 @@ class SerialHandler:
             parts = line[4:].split(",")
             parsed = self._parse_raw(parts)
         elif line.startswith("Uni:"):
-            parts = line[4:].split(",")
+            parts = line[5:].split(",")
             parsed = self._parse_uni(parts)
         elif line.startswith("Ori:") or line.startswith("Ori "):
             # Handle both "Ori:" and "Ori " formats
@@ -648,6 +650,7 @@ class IMUVisualizer:
         self.mag_points_queue = queue.Queue(maxsize=1000)
         self.serial_handler = SerialHandler(config, self.data_queue, self.mag_points_queue)
         self.current_imu = IMUData()
+        self.all_imu_data: List[IMUData] = []  # Store all data for CSV export
 
     def _init_pygame(self):
         pygame.init()
@@ -675,6 +678,7 @@ class IMUVisualizer:
         while not self.data_queue.empty():
             try:
                 self.current_imu = self.data_queue.get_nowait()
+                self.all_imu_data.append(self.current_imu)  # Store for CSV export
                 self.renderer_3d.update_orientation(
                     self.current_imu.roll,
                     self.current_imu.pitch,
@@ -691,6 +695,51 @@ class IMUVisualizer:
                 self.renderer_3d.add_mag_point(mx, my, mz)
             except queue.Empty:
                 break
+
+    def _save_data_to_csv(self):
+        """Save all collected IMU data to a CSV file using pandas."""
+        if not self.all_imu_data:
+            print("No data to save.")
+            return
+
+        # Convert IMUData objects to a list of dictionaries
+        data_dicts = []
+        for imu in self.all_imu_data:
+            data_dicts.append({
+                'timestamp': imu.timestamp,
+                'yaw': imu.yaw,
+                'pitch': imu.pitch,
+                'roll': imu.roll,
+                'raw_ax': imu.raw_ax,
+                'raw_ay': imu.raw_ay,
+                'raw_az': imu.raw_az,
+                'raw_gx': imu.raw_gx,
+                'raw_gy': imu.raw_gy,
+                'raw_gz': imu.raw_gz,
+                'raw_mx': imu.raw_mx,
+                'raw_my': imu.raw_my,
+                'raw_mz': imu.raw_mz,
+                'uni_ax': imu.uni_ax,
+                'uni_ay': imu.uni_ay,
+                'uni_az': imu.uni_az,
+                'uni_gx': imu.uni_gx,
+                'uni_gy': imu.uni_gy,
+                'uni_gz': imu.uni_gz,
+                'uni_mx': imu.uni_mx,
+                'uni_my': imu.uni_my,
+                'uni_mz': imu.uni_mz,
+                'mag_raw_magnitude': imu.mag_raw_magnitude,
+                'mag_cal_magnitude': imu.mag_cal_magnitude,
+            })
+
+        df = pd.DataFrame(data_dicts)
+
+        # Generate filename with timestamp
+        timestamp_str = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"imu_data_{timestamp_str}.csv"
+
+        df.to_csv(filename, index=False)
+        print(f"Saved {len(self.all_imu_data)} data points to {filename}")
 
     def _render(self):
         glClearColor(
@@ -768,7 +817,7 @@ class IMUVisualizer:
         print()
         print("Data format expected:")
         print("  Raw:ax,ay,az,gx,gy,gz,mx,my,mz  (uncalibrated, scaled)")
-        print("  Uni:ax,ay,az,gx,gy,gz,mx,my,mz  (calibrated, physical units)")
+        print("  Uni: ax,ay,az,gx,gy,gz,mx,my,mz  (calibrated, physical units)")
         print("  Ori: yaw,pitch,roll             (orientation in degrees)")
         print()
         print("Controls:")
@@ -792,6 +841,7 @@ class IMUVisualizer:
                 self.clock.tick(self.config.fps)
         finally:
             self.serial_handler.stop()
+            self._save_data_to_csv()
             pygame.quit()
             print("IMU Visualizer stopped")
 
