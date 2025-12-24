@@ -28,6 +28,17 @@
 // Expected WHO_AM_I value
 #define QMI_WHO_AM_I_VALUE 0x05
 
+// CTRL9 Commands (from General_Driver)
+#define QMI_CTRL9_CMD_NOP              0x00
+#define QMI_CTRL9_CMD_ON_DEMAND_CALI   0xA2
+
+// CTRL8 default value (from General_Driver)
+#define QMI_CTRL8_DEFAULT              0xC0
+
+// Status bits
+#define QMI_STATUS0_ACCEL_AVAIL        0x01
+#define QMI_STATUS0_GYRO_AVAIL         0x02
+
 // =============================================================================
 // QMI8658C Data Structure
 // =============================================================================

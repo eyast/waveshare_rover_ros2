@@ -14,12 +14,28 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
         return false;
     }
 
-    // Soft reset
+    // =========================================================================
+    // On-demand calibration (from General_Driver - CRITICAL for drift!)
+    // This performs factory-level gyroscope bias calibration
+    // =========================================================================
+    Serial.println("QMI8658C: Starting on-demand calibration...");
     i2c_write_register(addr_, QMI_RESET, 0xB0);
-    delay(50);
+    delay(10);
+    i2c_write_register(addr_, QMI_CTRL9, QMI_CTRL9_CMD_ON_DEMAND_CALI);
+    delay(2200);  // Must wait 2+ seconds for calibration to complete
+    i2c_write_register(addr_, QMI_CTRL9, QMI_CTRL9_CMD_NOP);
+    delay(100);
+    Serial.println("QMI8658C: On-demand calibration done");
 
     // CTRL1: SPI 4-wire, Address auto-increment enabled, Big-endian
-    i2c_write_register(addr_, QMI_CTRL1, 0x60);
+    // Plus interrupt enables (0x08 | 0x10 = 0x18) like General_Driver
+    i2c_write_register(addr_, QMI_CTRL1, 0x60 | 0x18);
+
+    // CTRL7: Disable sensors first before configuration (from General_Driver)
+    i2c_write_register(addr_, QMI_CTRL7, 0x00);
+
+    // CTRL8: Configure motion detection settings (from General_Driver)
+    i2c_write_register(addr_, QMI_CTRL8, QMI_CTRL8_DEFAULT);
 
     // CTRL2: Accelerometer config (full-scale << 4 | ODR)
     i2c_write_register(addr_, QMI_CTRL2, (accel_fs << 4) | odr);
@@ -27,7 +43,12 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
     // CTRL3: Gyroscope config (full-scale << 4 | ODR)
     i2c_write_register(addr_, QMI_CTRL3, (gyro_fs << 4) | odr);
 
-    // CTRL5: Enable low-pass filter for accel and gyro
+    // CTRL5: Enable low-pass filter for accel and gyro with proper mode
+    // Bits 0: Accel LPF enable, Bits 1-2: Accel LPF mode (mode 3 = strongest)
+    // Bits 4: Gyro LPF enable, Bits 5-6: Gyro LPF mode (mode 3 = strongest)
+    // Mode 3 for both: 0x06 << 1 = accel mode 3, 0x06 << 5 = gyro mode 3
+    // With enables: 0x01 | 0x06 | 0x10 | 0x60 = 0x77
+    // Keeping simpler config like original: just enable both with mode 0
     i2c_write_register(addr_, QMI_CTRL5, 0x11);
 
     // CTRL7: Enable accelerometer and gyroscope
@@ -45,6 +66,12 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
 }
 
 bool QMI8658C::read() {
+    // Check if data is ready (from General_Driver)
+    uint8_t status = i2c_read_register(addr_, QMI_STATUS0);
+    if (!(status & (QMI_STATUS0_ACCEL_AVAIL | QMI_STATUS0_GYRO_AVAIL))) {
+        return false;  // Data not ready yet
+    }
+
     uint8_t buffer[14];
 
     // Read temperature (2 bytes) + accel (6 bytes) + gyro (6 bytes)

@@ -231,18 +231,18 @@ void loop() {
         // Format: "Uni:ax,ay,az,gx,gy,gz,mx,my,mz"
         // Units: accel in m/s², gyro in rad/s, mag in uT
         // If a hardcording calibrator exists, this sends calibrated data
-        motioncal_send_unified(
-            imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
-            imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
-            mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
-        );
+        // motioncal_send_unified(
+        //     imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+        //     imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
+        //     mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
+        // );
 
         // Send orientation computed by our calibrated Madgwick filter
         // This provides stable yaw/pitch/roll in MotionCal
-        motioncal_send_orientation(
-            filter.get_yaw(),
-            filter.get_pitch(),
-            filter.get_roll()
-        );
+        // motioncal_send_orientation(
+        //     filter.get_yaw(),
+        //     filter.get_pitch(),
+        //     filter.get_roll()
+        // );
     }
 }

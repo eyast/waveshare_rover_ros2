@@ -26,17 +26,17 @@
 
 // Accelerometer full-scale selection
 // 0 = +/-2g, 1 = +/-4g, 2 = +/-8g, 3 = +/-16g
-#define ACCEL_FS_SEL 0
+#define ACCEL_FS_SEL 3 //0
 
 // Gyroscope full-scale selection
 // 0 = +/-16dps, 1 = +/-32dps, 2 = +/-64dps, 3 = +/-128dps
 // 4 = +/-256dps, 5 = +/-512dps, 6 = +/-1024dps, 7 = +/-2048dps
-#define GYRO_FS_SEL 5
+#define GYRO_FS_SEL 7 // 5
 
 // Output data rate selection
 // 0 = 8000Hz, 1 = 4000Hz, 2 = 2000Hz, 3 = 1000Hz
 // 4 = 500Hz, 5 = 250Hz, 6 = 117.5Hz, 7 = 58.75Hz
-#define ODR_SEL 6
+#define ODR_SEL 3 //6
 
 // Magnetometer scale factor (AK09918C)
 #define MAG_SCALE 0.15f  // uT/LSB
