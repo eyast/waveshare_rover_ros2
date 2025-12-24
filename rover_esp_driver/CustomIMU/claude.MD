@@ -1,4 +1,0 @@
-You wrote a custom driver in the folder CustomIMU. There was an existing driver already working in the folder General_Driver
-The custom driver has additional functionality that is great. it reports data in a format suitable for an application called MotionCal. But it drifts continuously (makes it look as if the device is moving, even when it's not). THe drift is linear, not noisy. This is probably due to a mistake you made in developing the driver.
-Your task is to look in the @general_driver folder for files related to IMU, and make sure that you are using the correct addresses, registers, and settings. Adapt from the general_driver as much as possible. Ideally, you want to use the same low-level access functions and build on them, instead of re-inventing them.
-Create a detailed plan of action and highlight the discrepancies, then tackle each one of them individually.

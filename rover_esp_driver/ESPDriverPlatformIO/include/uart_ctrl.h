@@ -1,3 +1,6 @@
+// IMU streaming state (0=off, 1=on)
+bool imu_stream_enabled = false;
+
 void jsonCmdReceiveHandler(){
 	int cmdType = jsonCmdReceive["T"].as<int>();
 	switch(cmdType){
@@ -71,6 +74,13 @@ void jsonCmdReceiveHandler(){
 												jsonCmdReceive["module"]
 												);
 												break;
+
+	// IMU streaming control
+	case CMD_IMU_STREAM_CTRL:
+		if (jsonCmdReceive.containsKey("cmd")) {
+			imu_stream_enabled = (jsonCmdReceive["cmd"].as<int>() == 1);
+		}
+		break;
 	}
 }
 

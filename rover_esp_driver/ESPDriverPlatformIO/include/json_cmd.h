@@ -84,30 +84,30 @@
 
 
 // {"T":126}
-#define CMD_GET_IMU_DATA	126
+// #define CMD_GET_IMU_DATA	126
 
-// the robot need to be put on a ground and kept still
-// getting the imu offset and set as default
-// this gonna take a while (5s)
-// {"T":127}
-#define CMD_CALI_IMU_STEP	127
+// // the robot need to be put on a ground and kept still
+// // getting the imu offset and set as default
+// // this gonna take a while (5s)
+// // {"T":127}
+// #define CMD_CALI_IMU_STEP	127
 
-// {"T":128}
-#define CMD_GET_IMU_OFFSET	128
+// // {"T":128}
+// #define CMD_GET_IMU_OFFSET	128
 
-// {"T":129,"x":-12,"y":0,"z":0}
-#define CMD_SET_IMU_OFFSET	129
+// // {"T":129,"x":-12,"y":0,"z":0}
+// #define CMD_SET_IMU_OFFSET	129
 
-// {"T":130}
-#define CMD_BASE_FEEDBACK 	130
+// // {"T":130}
+// #define CMD_BASE_FEEDBACK 	130
 
-// off: {"T":131,"cmd":0} [default]
-// 	on: {"T":131,"cmd":1}
-#define CMD_BASE_FEEDBACK_FLOW   131
+// // off: {"T":131,"cmd":0} [default]
+// // 	on: {"T":131,"cmd":1}
+// #define CMD_BASE_FEEDBACK_FLOW   131
 
-// set the extra delay time(ms) for feedback info
-// {"T":142,"cmd":0}
-#define CMD_FEEDBACK_FLOW_INTERVAL	142	// dev
+// // set the extra delay time(ms) for feedback info
+// // {"T":142,"cmd":0}
+// #define CMD_FEEDBACK_FLOW_INTERVAL	142	// dev
 
 // set the echo mode of recving new cmd.
 // 0: [default]off
@@ -573,3 +573,15 @@
 // {"T":900,"main":1,"module":0}
 // main_type: 1-WAVE ROVER, 2-UGV02, 3-UGV01
 #define CMD_MM_TYPE_SET 900
+
+
+// === === === IMU Streaming === === ===
+
+// Toggle IMU data streaming
+// off: {"T":325,"cmd":0} [default]
+//  on: {"T":325,"cmd":1}
+#define CMD_IMU_STREAM_CTRL    325
+
+// IMU stream data response type
+// {"T":326,"ax":...,"ay":...,...}
+#define FEEDBACK_IMU_STREAM    326
