@@ -48,6 +48,16 @@
 
 #define MADGWICK_BETA 0.1f
 
+// Adaptive beta settings (motion-based gain adjustment)
+#define ADAPTIVE_BETA_ENABLED     true
+#define ADAPTIVE_BETA_STATIONARY  0.5f    // When device is still
+#define ADAPTIVE_BETA_MOTION      0.05f   // When device is moving
+#define MOTION_THRESHOLD_RADS     0.05f   // ~3 deg/s
+
+// Fast convergence settings
+#define FAST_CONVERGENCE_DURATION_MS  2000
+#define FAST_CONVERGENCE_BETA         2.5f
+
 // =============================================================================
 // JSON Command Types (must match json_cmd.h)
 // =============================================================================
@@ -70,7 +80,7 @@
 #define CMD_STREAM_FORMAT   400   // {"T":400,"cmd":1}
 
 // =============================================================================
-// NEW: IMU Control Commands (330-350 range)
+// IMU Control Commands (330-360 range)
 // =============================================================================
 
 // Calibration commands
@@ -91,5 +101,28 @@
 
 // Orientation query
 #define CMD_IMU_GET_ORIENTATION  350   // {"T":350} -> {"T":350,"yaw":x,"pitch":y,"roll":z}
+
+// =============================================================================
+// NEW: Fast Initialization & Adaptive Beta Commands (351-360)
+// =============================================================================
+
+// Initialize filter from current sensor readings (instant alignment!)
+// This bypasses the slow convergence entirely
+#define CMD_IMU_INIT_FROM_SENSORS  351   // {"T":351}
+
+// Start fast convergence mode (high beta for quick alignment)
+// duration: milliseconds (0 = until stable)
+// beta: fast mode beta (default 2.5)
+#define CMD_IMU_FAST_CONVERGENCE   352   // {"T":352,"duration":2000,"beta":2.5}
+
+// Configure adaptive beta (motion-based gain adjustment)
+// enabled: 0/1
+// stationary: beta when still (default 0.5)
+// motion: beta when moving (default 0.05)
+// threshold: motion threshold in rad/s (default 0.05)
+#define CMD_IMU_ADAPTIVE_BETA      353   // {"T":353,"enabled":1,"stationary":0.5,"motion":0.05,"threshold":0.05}
+
+// Get filter convergence status
+#define CMD_IMU_CONVERGENCE_STATUS 354   // {"T":354} -> {"T":354,"rate":0.01,"converged":true,"active_beta":0.1}
 
 #endif // CONFIG_H

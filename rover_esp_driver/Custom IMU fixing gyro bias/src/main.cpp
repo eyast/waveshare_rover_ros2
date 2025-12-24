@@ -37,7 +37,7 @@ MagCalibrationReceiver cal_receiver;
 #include "ugv_config.h"
 #include "json_cmd.h"
 #include "motors.h"
-
+#include "imu_stream.h"
 #include "uart_ctrl.h"
 #include "i2c_helpers.h"
 
@@ -55,7 +55,7 @@ uint32_t last_update_us = 0;
 // -----------------------------------------------------------------------------
 // IMU Streaming
 // -----------------------------------------------------------------------------
-#include "imu_stream.h"
+
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -92,28 +92,26 @@ void setup() {
     // --- IMU Calibration ---
     // Device MUST be stationary and level during this phase!
     if (imu_ok) {
-            
-        
         screenLine_0 = "Calibrating";
         screenLine_1 = "Please keep steady";
-        screenLine_2 = "and leveld";
+        screenLine_2 = "and leveled";
         screenLine_3 = "...";
         oled_update();
         delay(1000);
         
         imu.calibrate_gyro(1000);
-        imu.calibrate_accel(1000);  // NEW: Accelerometer bias calibration
+        imu.calibrate_accel(1000);
         screenLine_0 = "";
         screenLine_1 = "";
         screenLine_2 = "";
         screenLine_3 = "done";
         oled_update();
-        delay(1000);
+        delay(500);
     }
 
     // --- Verify magnetometer dip angle ---
     if (mag_ok && imu_ok) {
-        // Take a few readings to verify calibration
+        // Take a few readings to stabilize
         for (int i = 0; i < 20; i++) {
             mag.read();
             delay(10);
@@ -137,6 +135,51 @@ void setup() {
         }
     }
 
+    // =========================================================================
+    // FILTER INITIALIZATION - KEY IMPROVEMENT!
+    // =========================================================================
+    // Instead of starting at identity [1,0,0,0] and waiting for slow
+    // convergence, we initialize from sensor readings for instant alignment.
+    
+    if (imu_ok) {
+        // Get fresh readings
+        imu.read();
+        const QMI8658C_Data& imu_data = imu.get_data();
+        
+        if (mag_ok) {
+            mag.read();
+            const AK09918C_Data& mag_data = mag.get_data();
+            
+            // Initialize with full 9-DOF - instant correct orientation!
+            filter.initialize_from_sensors(
+                imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+                mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
+            );
+            Serial.println("Filter initialized from accel+mag (9-DOF)");
+        } else {
+            // Fall back to accel-only (yaw will be 0)
+            filter.initialize_from_accel(
+                imu_data.accel[0], imu_data.accel[1], imu_data.accel[2]
+            );
+            Serial.println("Filter initialized from accel only (6-DOF, yaw=0)");
+        }
+        
+        // Configure adaptive beta for motion-aware operation
+        #if ADAPTIVE_BETA_ENABLED
+        filter.set_adaptive_beta(true);
+        filter.set_beta_range(ADAPTIVE_BETA_STATIONARY, ADAPTIVE_BETA_MOTION);
+        filter.set_motion_threshold(MOTION_THRESHOLD_RADS);
+        Serial.println("Adaptive beta enabled:");
+        Serial.print("  Stationary beta: "); Serial.println(ADAPTIVE_BETA_STATIONARY);
+        Serial.print("  Motion beta: "); Serial.println(ADAPTIVE_BETA_MOTION);
+        Serial.print("  Threshold: "); Serial.print(MOTION_THRESHOLD_RADS);
+        Serial.println(" rad/s");
+        #endif
+        
+        // Optional: Start with fast convergence for extra refinement
+        // filter.start_fast_convergence(FAST_CONVERGENCE_DURATION_MS, FAST_CONVERGENCE_BETA);
+    }
+
     // --- Power Monitor (INA219) ---
     ina219_init();
     inaDataUpdate();
@@ -153,9 +196,12 @@ void setup() {
     screenLine_2 = "";
     screenLine_3 = "Starting...";
     oled_update();
-    delay(1000);
+    delay(500);
 
-    screenLine_2 = screenLine_3;
+    // Show initial orientation
+    screenLine_2 = "Y:" + String((int)filter.get_yaw()) + 
+                   " P:" + String((int)filter.get_pitch()) + 
+                   " R:" + String((int)filter.get_roll());
     screenLine_3 = "Ready";
     oled_update();
 
@@ -164,8 +210,14 @@ void setup() {
 
     if (InfoPrint == 1) {
         Serial.println("\nSetup complete.");
-        Serial.println("Use JSON commands - see config.h for command types");
-        Serial.println("Example: {\"T\":112} to recalibrate all\n");
+        Serial.println("Filter initialized from sensors - no convergence delay!");
+        Serial.println("\nNew commands:");
+        Serial.println("  {\"T\":351}                     - Re-init from sensors");
+        Serial.println("  {\"T\":352,\"duration\":2000}   - Start fast convergence");
+        Serial.println("  {\"T\":353,\"enabled\":1}       - Enable adaptive beta");
+        Serial.println("  {\"T\":354}                     - Get convergence status");
+        Serial.println("  {\"T\":345}                     - Debug info");
+        Serial.println("");
     }
 }
 

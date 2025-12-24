@@ -122,6 +122,17 @@ void jsonCmdReceiveHandler() {
         imu.calibrate_gyro(500);
         imu.calibrate_accel(500);
         filter.reset();
+        // After calibrating, initialize from sensors for instant alignment
+        if (mag_ok) {
+            imu.read();
+            mag.read();
+            const QMI8658C_Data& imu_data = imu.get_data();
+            const AK09918C_Data& mag_data = mag.get_data();
+            filter.initialize_from_sensors(
+                imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+                mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
+            );
+        }
         jsonInfoSend.clear();
         jsonInfoSend["T"] = CMD_IMU_CALIBRATE_ALL;
         jsonInfoSend["status"] = "complete";
@@ -134,9 +145,11 @@ void jsonCmdReceiveHandler() {
     case CMD_IMU_FILTER_RESET:
         // {"T":335}
         filter.reset();
+        // After reset, optionally start fast convergence
+        filter.start_fast_convergence(FAST_CONVERGENCE_DURATION_MS, FAST_CONVERGENCE_BETA);
         jsonInfoSend.clear();
         jsonInfoSend["T"] = CMD_IMU_FILTER_RESET;
-        jsonInfoSend["status"] = "reset";
+        jsonInfoSend["status"] = "reset_with_fast_convergence";
         serializeJson(jsonInfoSend, Serial);
         Serial.println();
         break;
@@ -145,11 +158,11 @@ void jsonCmdReceiveHandler() {
         // {"T":336,"beta":0.1}
         if (jsonCmdReceive.containsKey("beta")) {
             float new_beta = jsonCmdReceive["beta"].as<float>();
-            if (new_beta > 0 && new_beta < 2.0f) {
+            if (new_beta > 0 && new_beta < 10.0f) {
                 filter.set_beta(new_beta);
                 jsonInfoSend.clear();
                 jsonInfoSend["T"] = CMD_IMU_SET_BETA;
-                jsonInfoSend["beta"] = filter.get_beta();
+                jsonInfoSend["beta"] = filter.get_base_beta();
                 serializeJson(jsonInfoSend, Serial);
                 Serial.println();
             }
@@ -212,7 +225,12 @@ void jsonCmdReceiveHandler() {
         Serial.print("Orientation: Y="); Serial.print(filter.get_yaw(), 1);
         Serial.print(" P="); Serial.print(filter.get_pitch(), 1);
         Serial.print(" R="); Serial.println(filter.get_roll(), 1);
-        Serial.print("Beta="); Serial.println(filter.get_beta(), 3);
+        Serial.print("Base Beta="); Serial.print(filter.get_base_beta(), 3);
+        Serial.print(" Active Beta="); Serial.println(filter.get_active_beta(), 3);
+        Serial.print("Convergence Rate="); Serial.print(filter.get_convergence_rate(), 4);
+        Serial.print(" Converged="); Serial.println(filter.is_converged() ? "YES" : "NO");
+        Serial.print("Adaptive Beta="); Serial.print(filter.get_adaptive_beta() ? "ON" : "OFF");
+        Serial.print(" Fast Mode="); Serial.println(filter.in_fast_convergence() ? "ACTIVE" : "OFF");
         break;
     }
 
@@ -242,7 +260,8 @@ void jsonCmdReceiveHandler() {
         float mag_h = sqrtf(mag_data.mag[0]*mag_data.mag[0] + mag_data.mag[1]*mag_data.mag[1]);
         float dip = atan2f(mag_data.mag[2], mag_h) * 180.0f / PI;
         jsonInfoSend["mag_dip"] = dip;
-        jsonInfoSend["beta"] = filter.get_beta();
+        jsonInfoSend["beta"] = filter.get_base_beta();
+        jsonInfoSend["active_beta"] = filter.get_active_beta();
         
         serializeJson(jsonInfoSend, Serial);
         Serial.println();
@@ -258,6 +277,117 @@ void jsonCmdReceiveHandler() {
         jsonInfoSend["yaw"] = filter.get_yaw();
         jsonInfoSend["pitch"] = filter.get_pitch();
         jsonInfoSend["roll"] = filter.get_roll();
+        serializeJson(jsonInfoSend, Serial);
+        Serial.println();
+        break;
+
+    // =========================================================================
+    // NEW: Fast Initialization & Adaptive Beta Commands (351-354)
+    // =========================================================================
+
+    case CMD_IMU_INIT_FROM_SENSORS: {
+        // {"T":351} - Initialize filter from current sensor readings
+        // This gives instant correct orientation!
+        if (!imu_ok) {
+            jsonInfoSend.clear();
+            jsonInfoSend["T"] = CMD_IMU_INIT_FROM_SENSORS;
+            jsonInfoSend["status"] = "error";
+            jsonInfoSend["message"] = "IMU not available";
+            serializeJson(jsonInfoSend, Serial);
+            Serial.println();
+            break;
+        }
+        
+        // Get fresh readings
+        imu.read();
+        const QMI8658C_Data& imu_data = imu.get_data();
+        
+        if (mag_ok) {
+            mag.read();
+            const AK09918C_Data& mag_data = mag.get_data();
+            filter.initialize_from_sensors(
+                imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+                mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
+            );
+        } else {
+            // Fall back to accel-only (yaw will be 0)
+            filter.initialize_from_accel(
+                imu_data.accel[0], imu_data.accel[1], imu_data.accel[2]
+            );
+        }
+        
+        jsonInfoSend.clear();
+        jsonInfoSend["T"] = CMD_IMU_INIT_FROM_SENSORS;
+        jsonInfoSend["status"] = "initialized";
+        jsonInfoSend["yaw"] = filter.get_yaw();
+        jsonInfoSend["pitch"] = filter.get_pitch();
+        jsonInfoSend["roll"] = filter.get_roll();
+        jsonInfoSend["with_mag"] = mag_ok;
+        serializeJson(jsonInfoSend, Serial);
+        Serial.println();
+        break;
+    }
+
+    case CMD_IMU_FAST_CONVERGENCE: {
+        // {"T":352,"duration":2000,"beta":2.5}
+        uint32_t duration = FAST_CONVERGENCE_DURATION_MS;
+        float fast_beta = FAST_CONVERGENCE_BETA;
+        
+        if (jsonCmdReceive.containsKey("duration")) {
+            duration = jsonCmdReceive["duration"].as<uint32_t>();
+        }
+        if (jsonCmdReceive.containsKey("beta")) {
+            fast_beta = jsonCmdReceive["beta"].as<float>();
+        }
+        
+        filter.start_fast_convergence(duration, fast_beta);
+        
+        jsonInfoSend.clear();
+        jsonInfoSend["T"] = CMD_IMU_FAST_CONVERGENCE;
+        jsonInfoSend["status"] = "started";
+        jsonInfoSend["duration"] = duration;
+        jsonInfoSend["beta"] = fast_beta;
+        serializeJson(jsonInfoSend, Serial);
+        Serial.println();
+        break;
+    }
+
+    case CMD_IMU_ADAPTIVE_BETA: {
+        // {"T":353,"enabled":1,"stationary":0.5,"motion":0.05,"threshold":0.05}
+        if (jsonCmdReceive.containsKey("enabled")) {
+            bool enabled = (jsonCmdReceive["enabled"].as<int>() == 1);
+            filter.set_adaptive_beta(enabled);
+        }
+        
+        if (jsonCmdReceive.containsKey("stationary") && jsonCmdReceive.containsKey("motion")) {
+            float stationary = jsonCmdReceive["stationary"].as<float>();
+            float motion = jsonCmdReceive["motion"].as<float>();
+            filter.set_beta_range(stationary, motion);
+        }
+        
+        if (jsonCmdReceive.containsKey("threshold")) {
+            float threshold = jsonCmdReceive["threshold"].as<float>();
+            filter.set_motion_threshold(threshold);
+        }
+        
+        jsonInfoSend.clear();
+        jsonInfoSend["T"] = CMD_IMU_ADAPTIVE_BETA;
+        jsonInfoSend["enabled"] = filter.get_adaptive_beta();
+        serializeJson(jsonInfoSend, Serial);
+        Serial.println();
+        break;
+    }
+
+    case CMD_IMU_CONVERGENCE_STATUS:
+        // {"T":354} -> {"T":354,"rate":0.01,"converged":true,"active_beta":0.1}
+        jsonInfoSend.clear();
+        jsonInfoSend["T"] = CMD_IMU_CONVERGENCE_STATUS;
+        jsonInfoSend["rate"] = filter.get_convergence_rate();
+        jsonInfoSend["converged"] = filter.is_converged();
+        jsonInfoSend["active_beta"] = filter.get_active_beta();
+        jsonInfoSend["base_beta"] = filter.get_base_beta();
+        jsonInfoSend["fast_mode"] = filter.in_fast_convergence();
+        jsonInfoSend["adaptive"] = filter.get_adaptive_beta();
         serializeJson(jsonInfoSend, Serial);
         Serial.println();
         break;

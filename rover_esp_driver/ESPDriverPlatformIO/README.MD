@@ -217,3 +217,7 @@ Hardcoded calibration values are stored in `include/hardcoded_calibration.h`. To
 - **Create temperature curve for calibration**: Change IMU calibration based on the temperature of the device. 
 - **Correct bias of accelerometer and gyroscope** - reduce the mean at runtime
 - **Calibrate with Orientation**: Try to calibrate with Orientation.
+- **Validation of JSON** to prevent malformed messages
+- **Code Analysis**
+- **Test motors**
+- 
