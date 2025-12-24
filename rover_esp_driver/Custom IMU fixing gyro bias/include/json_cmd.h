@@ -66,8 +66,8 @@
 // {"T": 500, "ssid": "abc", "pass": "password"}
 #define CMD_WIFI                500
 
-// WebSockets IP and port settings
-// {"T": 501, "server": "abc", "port": "password"}
+// WebSockets IP. Port is hardcoded at 8080
+// {"T": 501, "server": "10.0.0.1"}
 #define CMD_SERVER              501
 
 // GET STATUS OF WEBSOCKETS

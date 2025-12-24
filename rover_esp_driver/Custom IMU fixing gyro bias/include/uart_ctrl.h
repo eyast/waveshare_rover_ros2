@@ -411,16 +411,15 @@ void jsonCmdReceiveHandler() {
             wifiSSID = jsonCmdReceive["ssid"].as<String>();
             wifiPassword = jsonCmdReceive["pass"].as<String>();
             connectWiFi();
+            wsStatus();
         }
         break;
 
     // {"T": 501, "server": "abc", "port": "password"}
     case CMD_SERVER:
-        if (jsonCmdReceive.containsKey("server") && jsonCmdReceive.containsKey("port")) {
             serverIP = jsonCmdReceive["server"].as<String>();
-            serverPort = jsonCmdReceive["port"].as<uint16_t>();
             connectWebSocket();
-        }
+            wsStatus();
         break;
 
     // {"T": 502}
@@ -431,6 +430,8 @@ void jsonCmdReceiveHandler() {
     //  {"T": 503}
     case WS_START:
         wssendingEnabled = true;
+        connectWebSocket();
+        wsStatus();
         break;
 
     //  {"T": 504}
