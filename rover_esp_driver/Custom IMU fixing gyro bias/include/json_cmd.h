@@ -66,18 +66,14 @@
 // {"T": 500, "ssid": "abc", "pass": "password"}
 #define CMD_WIFI                500
 
-// WebSockets IP. Port is hardcoded at 8080
-// {"T": 501, "server": "10.0.0.1"}
-#define CMD_SERVER              501
-
 // GET STATUS OF WEBSOCKETS
 // {"T": 502}
-#define WS_STATUS               502
+#define WS_STATUS               501
 
 // START STREAMING WEBSOCKETS
 // {"T": 503}
-#define WS_START                503
+#define WS_START                502
 
 // STOP STREAMING WEBSOCKETS
 // {"T": 504}
-#define WS_STOP                 504
+#define WS_STOP                 503

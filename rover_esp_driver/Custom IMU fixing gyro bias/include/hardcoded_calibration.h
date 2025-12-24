@@ -46,7 +46,7 @@
 
 #define HARDCODED_FIELD_STRENGTH 56.58f //56.17f
 
-#define USE_HARDCODED_CALIBRATION true
+#define USE_HARDCODED_CALIBRATION false
 
 // =============================================================================
 // Apply calibration function

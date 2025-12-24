@@ -405,38 +405,36 @@ void jsonCmdReceiveHandler() {
         break;
 
     // --- WIFI and WebSockets ----
-    // note: lower case 'ssid' and 'pass'
+    // note: lower case 'ssid' and 'pass' and 'server'
     case CMD_WIFI:
-        if (jsonCmdReceive.containsKey("ssid") && jsonCmdReceive.containsKey("pass")) {
+        if (jsonCmdReceive.containsKey("ssid")){
             wifiSSID = jsonCmdReceive["ssid"].as<String>();
             wifiPassword = jsonCmdReceive["pass"].as<String>();
-            connectWiFi();
-            wsStatus();
-        }
-        break;
-
-    // {"T": 501, "server": "abc", "port": "password"}
-    case CMD_SERVER:
             serverIP = jsonCmdReceive["server"].as<String>();
+            connectWiFi();
+            wssendingEnabled = true;
+            imu_stream_enabled = true;
+            stream_as_json = false;
             connectWebSocket();
             wsStatus();
-        break;
+            break;
+        }
 
-    // {"T": 502}
+    // {"T": 501}
     case WS_STATUS:
         wsStatus();
         break;
 
-    //  {"T": 503}
+    //  {"T": 502}
     case WS_START:
         wssendingEnabled = true;
-        connectWebSocket();
         wsStatus();
         break;
 
-    //  {"T": 504}
+    //  {"T": 503}
     case WS_STOP:
         wssendingEnabled = false;
+        wsStatus();
         break;
     }
 }
