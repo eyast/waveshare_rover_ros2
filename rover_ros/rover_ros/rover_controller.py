@@ -42,7 +42,7 @@ from rclpy.node import Node
 from rclpy.duration import Duration
 from geometry_msgs.msg import Twist
 
-from pyrover import PyRover, BatteryEstimator
+from pyrover import PyRover, BatteryEstimator, IMUData_v2
 from rover_msgs.msg import (
     IMUv2,
     Temperature,
@@ -119,7 +119,7 @@ class RoverController(Node):
         self.cmd_vel_pub = self.create_publisher(
             Twist, 'cmd_vel', 10)
         self.imu_pub = self.create_publisher(
-        IMU, '/sensor/IMU', 10)
+        IMUv2, '/sensor/IMU', 10)
         self.temp_pub = self.create_publisher(
         Temperature, '/sensor/Temperature', 10)
         self.battery_pub = self.create_publisher(
@@ -127,49 +127,29 @@ class RoverController(Node):
         self.wheel_pub = self.create_publisher(
         Wheel, '/sensor/Wheel', 10)
 
-        # ===== Timers =====
-        self.poll_timer = self.create_timer(
-            1.0 / self.publish_rate, self._poll_publish)
-        self.emergency_timer = self.create_timer(
-            1.0 / self.publish_rate, self._emergency_check) # type: ignore
+    def _esp_callback(self, message):
+        try:
+            temp_imu = IMUData_v2.from_dict(message)
+            temp_imu= to_ros_msg(self, temp_imu)
+            self.imu_pub.publish(temp_imu)
+        except Exception as e:
+            self.get_logger().debug(f"IMU poll error: {e}")
+
     
     def _connect_robot(self):
         """Connect to the PyRover."""
         try:
             self.rover = PyRover(
                 port=self.port, # type: ignore
-                baudrate=self.baudrate # type: ignore
+                baudrate=self.baudrate,
+                callback=self._esp_callback # type: ignore
             )
             self.rover.connect()
-            self.rover.set_continuous_feedback(False)
-            self.rover.set_serial_echo(False)
+            self.rover.send_raw('{"T":325, 1}')
             self.get_logger().info(f"Connected to PyRover on {self.port}")
         except Exception as e:
             self.get_logger().error(f"Failed to connect: {e}")
             self.rover = None
-    
-    def _poll_publish(self):
-        """Poll and publishes IMU data"""
-        if self.rover is None or not self.rover.is_connected:
-            return
-        if self.publish_imu:
-            try:
-                with self.imu_lock:
-                    imu_data = self.rover.get_imu_data(timeout=0.1)
-                imu_msg, temp_msg = to_ros_msg(self, imu_data) # type: ignore
-                self.imu_pub.publish(imu_msg)
-                self.temp_pub.publish(temp_msg)
-            except Exception as e:
-                self.get_logger().debug(f"IMU poll error: {e}")
-        if self.publish_battery:
-            try:
-                with self.battery_lock:
-                    chassis = self.rover.get_chassis_info(timeout=0.1)
-                battery_msg, wheel_msg  = to_ros_msg(self, chassis) # type: ignore
-                self.battery_pub.publish(battery_msg)
-                self.wheel_pub.publish(wheel_msg)
-            except Exception as e:
-                self.get_logger().debug(f"Battery publishing error: {e}")
 
     def _emergency_check(self):
         # Stop the bot to align with the low level heartbeat (every 3 seconds)

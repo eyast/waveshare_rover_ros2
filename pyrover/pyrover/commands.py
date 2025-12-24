@@ -130,6 +130,15 @@ class CommandType(IntEnum):
     Format: {"T":600}
     """
 
+    # =========================================================================
+    # MEssage Format
+    # =========================================================================
+    IMU_TYPE = 600
+    """
+    Reboot the ESP32.
+    
+    Format: {"T":600}
+    """
 
 class ModuleType(IntEnum):
     """External module types for T=4 command."""

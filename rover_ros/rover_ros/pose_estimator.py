@@ -41,7 +41,7 @@ from rclpy.node import Node
 from geometry_msgs.msg import Twist, TransformStamped
 from tf2_ros import TransformBroadcaster
 
-from rover_msgs.msg import IMU, State
+from rover_msgs.msg import IMUv2, State
 from pyrover.tools import quaternion_from_euler, wrap_angle
 
 class PoseEstimate(Node):
@@ -65,7 +65,7 @@ class PoseEstimate(Node):
         # ===== Internal State =======
         self.state = State()
         self.latest_twist = Twist()
-        self.latest_imu = IMU()
+        self.latest_imu = IMUv2()
         self.last_time = self.get_clock().now()
         
         # ====== TF Broadcaster ======
@@ -82,7 +82,7 @@ class PoseEstimate(Node):
                                                     self._cmd_vel_cb,
                                                     10)
 
-        self.imu_sub = self.create_subscription(IMU,
+        self.imu_sub = self.create_subscription(IMUv2,
                                                 'sensor/IMU',
                                                 self._imu_cb,
                                                 10)
@@ -149,7 +149,7 @@ class PoseEstimate(Node):
         """Updates variables with latest commands issued to cmd_vel."""
         self.latest_twist = msg
 
-    def _imu_cb(self, msg: IMU):
+    def _imu_cb(self, msg: IMUv2):
         """Updates internal variables to support other functions."""
         self.latest_imu = msg
 
