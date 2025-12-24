@@ -191,9 +191,9 @@ void setup() {
 
     // --- OLED Display ---
     init_oled();
-    screenLine_0 = "Custom Waveshare";
-    screenLine_1 = "Rover Driver";
-    screenLine_2 = "";
+    screenLine_0 = "Waveshare Rover";
+    screenLine_1 = "Custom Driver";
+    screenLine_2 = "v0.96";
     screenLine_3 = "Starting...";
     oled_update();
     delay(500);
