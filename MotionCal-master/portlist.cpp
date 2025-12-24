@@ -128,6 +128,50 @@ static void macos_ports(io_iterator_t  * PortIterator, wxArrayString& list)
 }
 #endif
 
+// Add this function BEFORE serial_port_list(), after macos_ports():
+
+#if defined(MACOSX)
+static void scan_pty_devices(wxArrayString& list)
+{
+    // Scan for PTY slave devices (virtual serial ports)
+    // These are created by pty.openpty() in Python or similar
+    DIR *dir;
+    struct dirent *f;
+    char path[MAXPATHLEN];
+    struct stat st;
+    
+    dir = opendir("/dev/");
+    if (dir == NULL) return;
+    
+    while ((f = readdir(dir)) != NULL) {
+        // Look for ttys* devices (PTY slaves on macOS)
+        if (strncmp(f->d_name, "ttys", 4) != 0) continue;
+        
+        snprintf(path, sizeof(path), "/dev/%s", f->d_name);
+        
+        // Verify it's a character device
+        if (stat(path, &st) != 0 || !(st.st_mode & S_IFCHR)) continue;
+        
+        // Try to open it (skip if busy or permission denied)
+        int fd = open(path, O_RDWR | O_NOCTTY | O_NONBLOCK);
+        if (fd < 0) {
+            // If permission denied, still add it (user might fix permissions)
+            if (errno == EACCES) {
+                list.Add(path);
+            }
+            continue;
+        }
+        
+        // Check if it responds to termios (confirms it's a terminal)
+        struct termios tios;
+        if (tcgetattr(fd, &tios) == 0) {
+            list.Add(path);
+        }
+        close(fd);
+    }
+    closedir(dir);
+}
+#endif
 
 // Return a list of all serial ports
 wxArrayString serial_port_list()
@@ -235,6 +279,8 @@ wxArrayString serial_port_list()
 	   &serialPortIterator) != KERN_SUCCESS) return list;
 	macos_ports(&serialPortIterator, list);
 	IOObjectRelease(serialPortIterator);
+	// Adding virtual devices
+	scan_pty_devices(list);
 #elif defined(WINDOWS)
 	// http://msdn.microsoft.com/en-us/library/aa365461(VS.85).aspx
 	// page with 7 ways - not all of them work!
