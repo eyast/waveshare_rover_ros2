@@ -11,9 +11,11 @@ from typing import Dict, Any
 
 
 @dataclass
-class IMUData:
+class IMUData_v2:
     """
-    Full IMU sensor data from T=126 (GET_IMU_DATA) command.
+    New IMUData class.
+
+    Based on the datatype sent by the new ESP32 driver.
     
     This provides complete 9-axis IMU data including accelerometer,
     gyroscope, and magnetometer readings, plus the computed Euler angles
@@ -29,46 +31,38 @@ class IMUData:
     roll: float = 0.0
     pitch: float = 0.0
     yaw: float = 0.0
-    accel_x: float = 0.0
-    accel_y: float = 0.0
-    accel_z: float = 0.0
-    gyro_x: float = 0.0
-    gyro_y: float = 0.0
-    gyro_z: float = 0.0
-    mag_x: int = 0
-    mag_y: int = 0
-    mag_z: int = 0
-    mcal_valid: int = 0
-    temperature: float = 0.0
+    ax: float = 0.0
+    ay: float = 0.0
+    az: float = 0.0
+    gx: float = 0.0
+    gy: float = 0.0
+    gz: float = 0.0
+    mx: int = 0
+    my: int = 0
+    mz: int = 0
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> 'IMUData':
+    def from_dict(cls, data: Dict[str, Any]) -> 'IMUData_v2':
         """
         Create IMUData from response dictionary.
         
-        The rover returns JSON with abbreviated keys:
-        - 'r', 'p', 'y': roll, pitch, yaw
-        - 'ax', 'ay', 'az': accelerometer
-        - 'gx', 'gy', 'gz': gyroscope
-        - 'mx', 'my', 'mz': magnetometer
-        - 'temp': temperature
+        The rover returns JSON with abbreviated keys.
         """
         return cls(   
-            roll=data.get('r', 0.0),
-            pitch=data.get('p', 0.0),
-            yaw=data.get('y', 0.0),
-            accel_x=data.get('ax', 0.0),
-            accel_y=data.get('ay', 0.0),
-            accel_z=data.get('az', 0.0),
-            gyro_x=data.get('gx', 0.0),
-            gyro_y=data.get('gy', 0.0),
-            gyro_z=data.get('gz', 0.0),
-            mag_x=data.get('mx', 0.0),
-            mag_y=data.get('my', 0.0),
-            mag_z=data.get('mz', 0.0),
-            mcal_valid=data.get('mcal_valid', 0),
-            temperature=data.get('temp', 0.0),
+            roll=data.get('roll', 0.0),
+            pitch=data.get('pitch', 0.0),
+            yaw=data.get('yaw', 0.0),
+            ax=data["a"][0],
+            ay=data["a"][1],
+            az=data["a"][2],
+            gx=data["g"][0],
+            gy=data["g"][1],
+            gz=data["g"][2],
+            mx=data["m"][0],
+            my=data["m"][1],
+            mz=data["m"][2],
         )
+
 
 @dataclass 
 class ChassisInfo:

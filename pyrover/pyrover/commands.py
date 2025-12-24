@@ -60,14 +60,6 @@ class CommandType(IntEnum):
     Use SPEED_CTRL (T=1) instead for normal operation.
     """
     
-    ROS_CTRL = 13
-    """
-    ROS-style velocity control (UGV01 only - has encoders).
-    
-    Format: {"T":13, "X":<linear_x>, "Z":<angular_z>}
-    Units: m/s and rad/s
-    """
-    
     # =========================================================================
     # OLED Display (T: 3, -3)
     # =========================================================================
@@ -94,44 +86,6 @@ class CommandType(IntEnum):
     
     Format: {"T":4, "cmd":<module_type>}
     Values: 0=None, 1=RoArm-M2, 3=Gimbal
-    """
-    
-    # =========================================================================
-    # IMU & Sensors (T: 126-129)
-    # =========================================================================
-    GET_IMU_DATA = 126
-    """
-    Request full IMU data.
-    
-    Format: {"T":126}
-    
-    Response includes:
-    - r, p, y: roll, pitch, yaw (degrees)
-    - ax, ay, az: accelerometer (milli-g)
-    - gx, gy, gz: gyroscope (deg/s)
-    - mx, my, mz: magnetometer
-    - temp: temperature (C)
-    """
-    
-    CALI_IMU_STEP = 127
-    """
-    Start IMU calibration (reserved interface).
-    
-    Format: {"T":127}
-    """
-    
-    GET_IMU_OFFSET = 128
-    """
-    Get current IMU offset values.
-    
-    Format: {"T":128}
-    """
-    
-    SET_IMU_OFFSET = 129
-    """
-    Set IMU offset values (reserved interface).
-    
-    Format: {"T":129, "ax":<>, "ay":<>, "az":<>, "gx":<>, "gy":<>, "gz":<>}
     """
     
     # =========================================================================
@@ -166,115 +120,6 @@ class CommandType(IntEnum):
     Format: {"T":132, "IO4":<0-255>, "IO5":<0-255>}
     """
     
-    GIMBAL_CTRL = 133
-    """
-    Control pan-tilt gimbal.
-    
-    Format: {"T":133, "X":<angle>, "Y":<angle>, "SPD":<speed>, "ACC":<accel>}
-    """
-    
-    SERIAL_ECHO = 143
-    """
-    Enable/disable serial command echo.
-    
-    Format: {"T":143, "cmd":<0|1>}
-    
-    When enabled, all sent commands are echoed back.
-    """
-    
-    # =========================================================================
-    # ESP-NOW Communication (T: 301-306)
-    # =========================================================================
-    ESPNOW_MODE = 301
-    """
-    Enable/disable ESP-NOW command receiving.
-    
-    Format: {"T":301, "mode":<0|3>}
-    """
-    
-    ESPNOW_ADD_PEER = 303
-    """
-    Add a peer for ESP-NOW communication.
-    
-    Format: {"T":303, "mac":"<MAC_ADDRESS>"}
-    Example: {"T":303, "mac":"CC:DB:A7:5C:1C:40"}
-    """
-    
-    ESPNOW_DEL_PEER = 304
-    """
-    Remove a peer from ESP-NOW communication.
-    
-    Format: {"T":304, "mac":"<MAC_ADDRESS>"}
-    """
-    
-    ESPNOW_MULTICAST = 305
-    """
-    Send command to all added peers (multicast).
-    
-    Format: {"T":305, "dev":0, "b":0, "s":0, "e":0, "h":0, "cmd":1, "megs":"<json>"}
-    """
-    
-    ESPNOW_UNICAST = 306
-    """
-    Send command to specific peer (unicast).
-    
-    Format: {"T":306, "mac":"<MAC>", "dev":0, "b":0, "s":0, "e":0, "h":0, "cmd":1, "megs":"<json>"}
-    """
-    
-    # =========================================================================
-    # WiFi Configuration (T: 401-408)
-    # =========================================================================
-    WIFI_MODE = 401
-    """
-    Set WiFi operating mode.
-    
-    Format: {"T":401, "cmd":<mode>}
-    Modes: 0=OFF, 1=AP, 2=STA, 3=AP+STA
-    """
-    
-    WIFI_AP_CONFIG = 403
-    """
-    Configure WiFi Access Point.
-    
-    Format: {"T":403, "ssid":"<name>", "password":"<pass>"}
-    """
-    
-    WIFI_STA_CONFIG = 404
-    """
-    Configure WiFi Station mode (connect to network).
-    
-    Format: {"T":404, "sta_ssid":"<name>", "sta_password":"<pass>",
-             "ap_ssid":"<fallback>", "ap_password":"<fallback_pass>"}
-    """
-    
-    WIFI_INFO = 405
-    """
-    Get current WiFi configuration.
-    
-    Format: {"T":405}
-    """
-    
-    WIFI_CONFIG_CREATE = 406
-    """
-    Save WiFi settings to config file.
-    
-    Format: {"T":406}
-    """
-    
-    WIFI_CONFIG_CREATE_NEW = 407
-    """
-    Create new WiFi config file.
-    
-    Format: {"T":407}
-    """
-    
-    WIFI_DISCONNECT = 408
-    """
-    Disconnect WiFi.
-    
-    Format: {"T":408}
-    """
-    
     # =========================================================================
     # System (T: 600)
     # =========================================================================
@@ -292,10 +137,3 @@ class ModuleType(IntEnum):
     ROARM_M2 = 1
     GIMBAL = 3
 
-
-class WiFiMode(IntEnum):
-    """WiFi operating modes for T=401 command."""
-    OFF = 0
-    AP = 1      # Access Point mode (robot creates network)
-    STA = 2     # Station mode (robot connects to network)
-    AP_STA = 3  # Both AP and Station

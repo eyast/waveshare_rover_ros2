@@ -44,7 +44,7 @@ from geometry_msgs.msg import Twist
 
 from pyrover import PyRover, BatteryEstimator
 from rover_msgs.msg import (
-    IMU,
+    IMUv2,
     Temperature,
     Battery,
     Wheel

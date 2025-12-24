@@ -1,0 +1,14 @@
+# IMUv2.msg
+std_msgs/Header header
+float32 pitch
+float32 roll
+float32 yaw
+float32 ax
+float32 ay
+float32 az
+int32 gx
+int32 gy
+int32 gz
+float32 mx
+float32 my
+float32 mz

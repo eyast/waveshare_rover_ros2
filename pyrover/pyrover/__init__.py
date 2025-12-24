@@ -62,13 +62,12 @@ Quick Start
 
 from .rover import PyRover
 from .data_types import (
-    IMUData,
+    IMUData_v2,
     ChassisInfo,
     BatteryEstimator,
 )
 from .commands import (
     CommandType,
-    WiFiMode,
     ModuleType,
 )
 from .tools import quaternion_from_euler, wrap_angle
@@ -81,13 +80,12 @@ __all__ = [
     "PyRover",
     
     # Data types
-    "IMUData",
+    "IMUData_v2",
     "ChassisInfo",
     "BatteryEstimator",
     
     # Command enums
     "CommandType",
-    "WiFiMode",
     "ModuleType",
 
     # Tools

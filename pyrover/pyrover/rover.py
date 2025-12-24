@@ -34,8 +34,8 @@ import json
 import time
 from typing import Optional, Callable, Dict, Any, Union
 
-from .commands import CommandType, WiFiMode
-from .data_types import IMUData, ChassisInfo
+from .commands import CommandType
+from .data_types import IMUData_v2, ChassisInfo
 
 
 class PyRover:
@@ -130,8 +130,6 @@ class PyRover:
             self.port,
             baudrate=self.baudrate,
             timeout=self.timeout,
-            #rtscts=False,
-            #dsrdtr=False
         )
         # Disable hardware flow control signals that might interfere
         self._ser.rts = False
@@ -144,9 +142,6 @@ class PyRover:
         # Small delay to let things settle
         time.sleep(0.1)
         
-        # Hardcoding polling 
-        self.set_continuous_feedback(False)
-        self.set_serial_echo(False)
     
     def disconnect(self) -> None:
         """Close serial connection and stop reading thread."""
@@ -167,11 +162,7 @@ class PyRover:
         is not connected to the Waveshare board. Therefore,
         this function also sends a query to the board
         """
-        return self._ser is not None and self._ser.is_open #and self.test_connection()
-    
-    def test_connection(self) -> bool:
-        """Test the connection by sending an IMU request"""
-        return True if self.get_imu_data(timeout=1) else False
+        return self._ser is not None and self._ser.is_open
 
     def _read_serial(self) -> None:
         """Background thread for reading serial data."""
@@ -232,7 +223,7 @@ class PyRover:
             
             # Send command
             cmd_str = json.dumps(command, separators=(',', ':'))
-            self._ser.write(cmd_str.encode() + b'\n')
+            self._ser.write(cmd_str.encode() + b'\n') # type:ignore
             
             if wait_response:
                 if self._response_event.wait(timeout):
@@ -250,7 +241,7 @@ class PyRover:
         if not self.is_connected:
             raise ConnectionError("Not connected to WAVE ROVER")
         
-        self._ser.write(data.encode() + b'\n')
+        self._ser.write(data.encode() + b'\n') #type: ignore
 
     # =========================================================================
     # Motion Control
@@ -339,27 +330,7 @@ class PyRover:
         for i, text in enumerate(lines[:4]):
             self.oled_print(i, text)
 
-    # =========================================================================
-    # IMU & Sensors
-    # =========================================================================
-    
-    def get_imu_data(self, timeout: float = 1.0) -> Optional[IMUData]:
-        """
-        Retrieve IMU sensor data.
-        
-        Returns:
-            IMUData object with sensor readings, or None on timeout
-        """
-        response = self.send_command(
-            {"T": CommandType.GET_IMU_DATA},
-            wait_response=True,
-            timeout=timeout
-        )
-        
-        if response:
-            if response["T"] == 1002:
-                return IMUData.from_dict(response)
-        return None
+
 
     # =========================================================================
     # Chassis Information
@@ -381,196 +352,6 @@ class PyRover:
         if response:
             return ChassisInfo.from_dict(response)
         return None
-    
-    def set_continuous_feedback(self, enabled: bool) -> None:
-        """
-        Enable/disable continuous serial feedback.
-        
-        When enabled, chassis continuously sends feedback without polling.
-        Useful for ROS integration.
-        
-        Args:
-            enabled: True to enable, False to disable
-        """
-        self.send_command({
-            "T": CommandType.BASE_FEEDBACK_FLOW,
-            "cmd": 1 if enabled else 0
-        })
-    
-    def set_serial_echo(self, enabled: bool) -> None:
-        """
-        Enable/disable serial command echo.
-        
-        When enabled, all sent commands are echoed back.
-        
-        Args:
-            enabled: True to enable, False to disable
-        """
-        self.send_command({
-            "T": CommandType.SERIAL_ECHO,
-            "cmd": 1 if enabled else 0
-        })
-
-    # =========================================================================
-    # WiFi Configuration
-    # =========================================================================
-    
-    def set_wifi_mode(self, mode: Union[WiFiMode, int]) -> None:
-        """
-        Set WiFi operating mode.
-        
-        Args:
-            mode: WiFiMode enum (OFF, AP, STA, AP_STA)
-        """
-        self.send_command({
-            "T": CommandType.WIFI_MODE,
-            "cmd": int(mode)
-        })
-    
-    def configure_wifi_ap(self, ssid: str, password: str) -> None:
-        """
-        Configure WiFi Access Point mode.
-        
-        Args:
-            ssid: Network name
-            password: Network password
-        """
-        self.send_command({
-            "T": CommandType.WIFI_AP_CONFIG,
-            "ssid": ssid,
-            "password": password
-        })
-    
-    def configure_wifi_sta(
-        self,
-        sta_ssid: str,
-        sta_password: str,
-        ap_ssid: str = "UGV",
-        ap_password: str = "12345678"
-    ) -> None:
-        """
-        Configure WiFi Station mode (connect to existing network).
-        
-        Args:
-            sta_ssid: Network to connect to
-            sta_password: Network password
-            ap_ssid: Fallback AP name
-            ap_password: Fallback AP password
-        """
-        self.send_command({
-            "T": CommandType.WIFI_STA_CONFIG,
-            "ap_ssid": ap_ssid,
-            "ap_password": ap_password,
-            "sta_ssid": sta_ssid,
-            "sta_password": sta_password
-        })
-    
-    def get_wifi_info(self, timeout: float = 1.0) -> Optional[Dict[str, Any]]:
-        """Get current WiFi configuration."""
-        return self.send_command(
-            {"T": CommandType.WIFI_INFO},
-            wait_response=True,
-            timeout=timeout
-        )
-    
-    def save_wifi_config(self) -> None:
-        """Save current WiFi settings to config file."""
-        self.send_command({"T": CommandType.WIFI_CONFIG_CREATE})
-    
-    def disconnect_wifi(self) -> None:
-        """Disconnect WiFi connection."""
-        self.send_command({"T": CommandType.WIFI_DISCONNECT})
-
-    # =========================================================================
-    # ESP-NOW Communication
-    # =========================================================================
-    
-    def set_espnow_mode(self, receive_enabled: bool) -> None:
-        """
-        Enable/disable ESP-NOW command receiving.
-        
-        Args:
-            receive_enabled: True to receive commands, False to ignore
-        """
-        self.send_command({
-            "T": CommandType.ESPNOW_MODE,
-            "mode": 3 if receive_enabled else 0
-        })
-    
-    def espnow_add_peer(self, mac_address: str) -> None:
-        """
-        Add a peer for ESP-NOW communication.
-        
-        Args:
-            mac_address: MAC address (e.g., "CC:DB:A7:5C:1C:40")
-        """
-        self.send_command({
-            "T": CommandType.ESPNOW_ADD_PEER,
-            "mac": mac_address
-        })
-    
-    def espnow_remove_peer(self, mac_address: str) -> None:
-        """
-        Remove a peer from ESP-NOW communication.
-        
-        Args:
-            mac_address: MAC address to remove
-        """
-        self.send_command({
-            "T": CommandType.ESPNOW_DEL_PEER,
-            "mac": mac_address
-        })
-    
-    def espnow_send(self, mac_address: str, command: Dict[str, Any]) -> None:
-        """
-        Send a command to a specific device via ESP-NOW (unicast).
-        
-        Args:
-            mac_address: Target MAC address
-            command: JSON command to send
-        """
-        self.send_command({
-            "T": CommandType.ESPNOW_UNICAST,
-            "mac": mac_address,
-            "dev": 0,
-            "b": 0,
-            "s": 0,
-            "e": 0,
-            "h": 0,
-            "cmd": 1,
-            "megs": json.dumps(command, separators=(',', ':'))
-        })
-    
-    def espnow_broadcast(self, command: Dict[str, Any]) -> None:
-        """
-        Broadcast a command to all devices via ESP-NOW.
-        
-        Args:
-            command: JSON command to broadcast
-        """
-        # First add broadcast address as peer
-        self.espnow_add_peer("FF:FF:FF:FF:FF:FF")
-        time.sleep(0.05)
-        
-        self.espnow_send("FF:FF:FF:FF:FF:FF", command)
-    
-    def espnow_multicast(self, command: Dict[str, Any]) -> None:
-        """
-        Send command to all added peers via ESP-NOW (multicast).
-        
-        Args:
-            command: JSON command to send
-        """
-        self.send_command({
-            "T": CommandType.ESPNOW_MULTICAST,
-            "dev": 0,
-            "b": 0,
-            "s": 0,
-            "e": 0,
-            "h": 0,
-            "cmd": 1,
-            "megs": json.dumps(command, separators=(',', ':'))
-        })
 
     # =========================================================================
     # System Commands
