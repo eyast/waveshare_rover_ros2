@@ -9,7 +9,7 @@
 // State Variables
 // -----------------------------------------------------------------------------
 
-bool imu_stream_enabled = false;
+bool imu_stream_enabled = true;
 
 // -----------------------------------------------------------------------------
 // JSON Command Handler
@@ -67,6 +67,12 @@ void jsonCmdReceiveHandler() {
         }
         break;
 
+	case CMD_STREAM_FORMAT:
+	if (jsonCmdReceive.containsKey("cmd")) {
+            stream_as_json = (jsonCmdReceive["cmd"].as<int>() == 1);
+        }
+        break;
+		
     // --- System Control ---
 
     case CMD_REBOOT:

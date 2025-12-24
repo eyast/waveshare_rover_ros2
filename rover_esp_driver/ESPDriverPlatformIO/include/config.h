@@ -58,4 +58,11 @@
 // Lower = smoother but slower response
 #define MADGWICK_BETA 0.05f
 
+// =============================================================================
+// IMU Stream Mode and Options
+// =============================================================================
+
+bool stream_as_json = false;
+bool stream_orientiation = true;
+
 #endif // CONFIG_H

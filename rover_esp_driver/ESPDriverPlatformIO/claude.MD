@@ -1,10 +1,3 @@
-i am porting some code into a library. In the loop of main.cpp, I read IMU and MAG, and share that data over serial. I want you to port that code to my driver (which includes OLED and INA), but differently:
-- you must re-use the components that exist, and dont create anything wild
-- You must not change how IMU and MAG are processed, everything about them should remain the same
-- You must create a new JSON command that follows the schema in json_cmd.h. the new command's identifier is T 225. It can accepts values of 0 or 1, by default its 0. if the value is set to 1, the UART will start streaming IMUData and (units, calibrated) AND orientation data (pritch roll yaw) and a field that includes dt (delta time). If the switch goes to 0, the streaming should stop. The iformation that is streamed must be returned in JSON as well. Each reply must start with {"T": 226}
-- Do not create other JSON commands
-
-The destination code where you must perform your work is in ESPDriverPlatformIO. The main loop that you must port is in CustomIMU. You must modify (from ESPDriverPlatformIO folder)
-- main.cpp 
-- json_cmd.h
-- uart_ctrl.h
+Create a new command in json_cmd.h, with the same schema. the command number if 400.
+it can take the value 0, 1, or 2. by default it is 0
+- when it is 0, the data streamed should not be in JSON format. Instead, it must be just like MotionCal was expected it on the serial bus(a code snipped is below). The data should in

@@ -70,6 +70,7 @@ void sendIMUStreamData() {
     const QMI8658C_Data& imu_data = imu.get_data();
     const AK09918C_Data& mag_data = mag.get_data();
 
+    if (stream_as_json){
     jsonInfoSend.clear();
     jsonInfoSend["T"] = FEEDBACK_IMU_STREAM;
 
@@ -98,6 +99,28 @@ void sendIMUStreamData() {
 
     serializeJson(jsonInfoSend, Serial);
     Serial.println();
+    }
+    else {
+        float mag_raw_ut[3] = {
+            mag_data.mag_raw[0] * 0.15f,
+            mag_data.mag_raw[1] * 0.15f,
+            mag_data.mag_raw[2] * 0.15f
+        };
+
+        // Uncalibratd data
+        motioncal_send_raw(
+            imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+            imu_data.gyro_dps[0], imu_data.gyro_dps[1], imu_data.gyro_dps[2],
+            mag_raw_ut[0], mag_raw_ut[1], mag_raw_ut[2]
+        );
+        if (stream_orientiation){
+                motioncal_send_orientation(
+                    filter.get_yaw(),
+                    filter.get_pitch(),
+                    filter.get_roll()
+        );
+        }
+    }
 }
 
 #endif // IMU_STREAM_H

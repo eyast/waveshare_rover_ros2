@@ -27,14 +27,15 @@ JsonDocument jsonInfoHttp;
 #include "ugv_config.h"
 #include "json_cmd.h"
 #include "motors.h"
-#include "uart_ctrl.h"
 #include "config.h"
+#include "uart_ctrl.h"
 #include "i2c_helpers.h"
 #include "qmi8658c.h"
 #include "ak09918c.h"
 #include "madgwick.h"
 #include "mag_calibration.h"
 #include "hardcoded_calibration.h"
+#include "motioncal_output.h"
 
 // -----------------------------------------------------------------------------
 // IMU Sensor Instances
@@ -61,9 +62,7 @@ static unsigned long loop_count = 0;
 // -----------------------------------------------------------------------------
 #include "imu_stream.h"
 
-// =============================================================================
-// Setup
-// =============================================================================
+
 
 void setup() {
     // --- Serial ---

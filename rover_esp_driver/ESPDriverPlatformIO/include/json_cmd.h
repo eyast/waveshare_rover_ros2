@@ -585,3 +585,6 @@
 // IMU stream data response type
 // {"T":326,"ax":...,"ay":...,...}
 #define FEEDBACK_IMU_STREAM    326
+
+
+#define CMD_STREAM_FORMAT      400
