@@ -118,7 +118,7 @@ class PoseEstimate(Node):
                                             dt)
             state_new.x = x_new
             state_new.y = y_new
-            state_new.theta = np.deg2rad (self.latest_imu.yaw)
+            state_new.theta = np.deg2rad (self.latest_imu.y)
         self.state = state_new
         self.state_pub.publish(state_new)
         self._publish_tf(now)

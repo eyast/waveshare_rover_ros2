@@ -22,9 +22,10 @@ def to_ros_msg(ros_node, data: IMUData_v2) -> IMUv2:
         msg = IMUv2()
         msg.header.frame_id = header
         msg.header.stamp = ts
-        msg.pitch = data.pitch
-        msg.roll = data.roll
-        msg.yaw = data.yaw
+        msg.p = data.p
+        msg.r = data.r
+        msg.y = data.y
+        msg.t = data.t
         msg.ax = data.ax
         msg.ay = data.ay
         msg.az = data.az
