@@ -140,6 +140,36 @@ class CommandType(IntEnum):
     Format: {"T":325, "cmd":1}
     """
 
+
+    WIFI = 500
+    """
+    Set Wifi and Websocket configuration.
+    Hardcoded port 8080.
+
+    Format: {"T":500, "ssid":"WiFi-849465", "pass":"11929017", "server":"192.168.10.64"}
+    """
+
+    WS_STATUS = 501
+    """
+    WebSockets Status
+    
+    Format: {"T":501}
+    """
+
+    WS_START = 502
+    """
+    Start streaming to WebSockets
+
+    Format: {"T":502}
+    """
+
+
+    WS_STOP = 503
+    """
+    Stop streaming to WebSockets
+
+    Format: {"T":503}
+    """
 class ModuleType(IntEnum):
     """External module types for T=4 command."""
     NONE = 0

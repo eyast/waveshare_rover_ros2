@@ -42,6 +42,7 @@ setup(
         'console_scripts': [
             # Calibration tools
             'pyrover-calibrate-motors = pyrover.calibration.motor:run_motor_calibration_cli',
+            'pyrover-calibrate-motioncal = pyrover.calibration.remote_motioncal:run_calibrator_cli',
         ],
     },
     

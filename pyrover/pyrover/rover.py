@@ -142,7 +142,6 @@ class PyRover:
         # Small delay to let things settle
         time.sleep(0.1)
         
-    
     def disconnect(self) -> None:
         """Close serial connection and stop reading thread."""
         self._running = False
@@ -245,7 +244,49 @@ class PyRover:
 
 
     # =========================================================================
-    # Motion Control
+    # WiFi and Websockets
+    # =========================================================================
+    
+    def connect_to_wifi(self, server_ip) -> Optional[Dict]:
+        """
+        Connects to WiFi and a Websocket server on port 8080.
+        Used to stream IMU raw data to a remote server running Motioncal.
+        """
+
+        response = self.send_command({
+            "T": CommandType.WIFI,
+            "ssid": "WiFi-849465", 
+            "pass":"11929017", 
+            "server": server_ip
+        }, timeout=60)
+        if response:
+            return response
+        else:
+            return None
+
+    def start_ws_streaming(self) -> Optional[Dict]:
+        """Starts WebSockets streaming."""
+
+        response = self.send_command({
+            "T": CommandType.WS_START})
+        return response if response else None
+
+    def stop_ws_streaming(self) -> Optional[Dict]:
+        """Stops WebSockets streaming."""
+
+        response = self.send_command({
+            "T": CommandType.WS_STOP})
+        return response if response else None
+    
+    def getstatus_ws_streaming(self) -> Optional[Dict]:
+        """Get Status of WebSockets streaming."""
+
+        response = self.send_command({
+            "T": CommandType.WS_STATUS})
+        return response if response else None
+
+    # =========================================================================
+    # IMU
     # =========================================================================
     
     def set_imu_stream(self, mode) -> None:
