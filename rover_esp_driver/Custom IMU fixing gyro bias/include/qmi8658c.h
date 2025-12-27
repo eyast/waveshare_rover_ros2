@@ -2,6 +2,9 @@
 #define QMI8658C_H
 
 #include <Arduino.h>
+#include "config.h"
+
+extern bool imu_ok;
 
 // =============================================================================
 // QMI8658C Register Definitions
@@ -79,5 +82,7 @@ private:
     float gyro_scale_;
     QMI8658C_Data data_;
 };
+
+extern QMI8658C imu;
 
 #endif // QMI8658C_H

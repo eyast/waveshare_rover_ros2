@@ -1,5 +1,9 @@
 #include "ak09918c.h"
+#include "config.h"
 #include "i2c_helpers.h"
+
+AK09918C mag(AK09918C_ADDR);
+bool mag_ok = false;
 
 AK09918C::AK09918C(uint8_t addr) : addr_(addr), scale_(0.15f) {
     memset(&data_, 0, sizeof(data_));

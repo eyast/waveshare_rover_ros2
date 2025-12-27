@@ -51,3 +51,12 @@ unsigned long prev_time = 0;
 JsonDocument jsonCmdReceive;
 JsonDocument jsonInfoSend;
 JsonDocument jsonInfoHttp;
+
+
+// -----------------------------------------------------------------------------
+// IMU State
+// -----------------------------------------------------------------------------
+
+
+uint32_t last_update_us = 0;
+uint32_t last_update_ina = 0;

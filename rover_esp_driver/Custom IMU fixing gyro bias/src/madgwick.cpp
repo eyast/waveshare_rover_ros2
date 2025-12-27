@@ -1,6 +1,8 @@
 #include "madgwick.h"
 #include <math.h>
 
+MadgwickFilter filter(MADGWICK_BETA);
+
 MadgwickFilter::MadgwickFilter(float beta) : base_beta_(beta), beta_(beta) {
     reset();
 }

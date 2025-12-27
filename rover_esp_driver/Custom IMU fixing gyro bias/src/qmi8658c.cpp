@@ -1,5 +1,9 @@
 #include "qmi8658c.h"
 #include "i2c_helpers.h"
+#include "config.h"
+
+QMI8658C imu(QMI8658C_ADDR);
+bool imu_ok = false;
 
 QMI8658C::QMI8658C(uint8_t addr) : addr_(addr), accel_scale_(0), gyro_scale_(0) {
     memset(&data_, 0, sizeof(data_));

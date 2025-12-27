@@ -7,3 +7,4 @@ The General Driver v3 is optimized for continuous operation. It features:
 - A built-in Magdwick filter that can be disabled.
 - Beta convergeance
 - Stream to Websockets server for remote calibration
+- Allows setting the desired frequency

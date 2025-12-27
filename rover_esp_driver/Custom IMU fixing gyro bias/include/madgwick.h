@@ -2,6 +2,7 @@
 #define MADGWICK_H
 
 #include <Arduino.h>
+#include "config.h"
 
 // =============================================================================
 // Madgwick AHRS Filter (Enhanced)
@@ -155,5 +156,7 @@ private:
     static void euler_to_quaternion(float roll, float pitch, float yaw,
                                      float* q0, float* q1, float* q2, float* q3);
 };
+
+extern MadgwickFilter filter;
 
 #endif // MADGWICK_H

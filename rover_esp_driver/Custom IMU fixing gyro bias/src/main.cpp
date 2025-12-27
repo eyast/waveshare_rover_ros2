@@ -19,17 +19,10 @@
 #include <ArduinoJson.h>
 #include "websockets.h"
 #include <SCServo.h>
-#include <Adafruit_SSD1306.h>
-#include "qmi8658c.h"
-#include "ak09918c.h"
-#include "madgwick.h"
 #include "config.h"
-QMI8658C imu(QMI8658C_ADDR);
-AK09918C mag(AK09918C_ADDR);
-MadgwickFilter filter(MADGWICK_BETA);
+
 
 #include <INA219_WE.h>
-#include <PID_v2.h>
 #include "battery_ctrl.h"
 #include "oled_ctrl.h"
 #include "motors.h"
@@ -40,14 +33,6 @@ MadgwickFilter filter(MADGWICK_BETA);
 #include "hardcoded_calibration.h"
 #include "motioncal_output.h"
 
-
-// -----------------------------------------------------------------------------
-// IMU State
-// -----------------------------------------------------------------------------
-bool imu_ok = false;
-bool mag_ok = false;
-uint32_t last_update_us = 0;
-uint32_t last_update_ina = 0;
 
 // -----------------------------------------------------------------------------
 // Setup
@@ -199,18 +184,6 @@ void setup() {
 
     // Initialize timing
     last_update_us = micros();
-
-    if (InfoPrint == 1) {
-        Serial.println("\nSetup complete.");
-        Serial.println("Filter initialized from sensors - no convergence delay!");
-        Serial.println("\nNew commands:");
-        Serial.println("  {\"T\":351}                     - Re-init from sensors");
-        Serial.println("  {\"T\":352,\"duration\":2000}   - Start fast convergence");
-        Serial.println("  {\"T\":353,\"enabled\":1}       - Enable adaptive beta");
-        Serial.println("  {\"T\":354}                     - Get convergence status");
-        Serial.println("  {\"T\":345}                     - Debug info");
-        Serial.println("");
-    }
 }
 
 // =============================================================================

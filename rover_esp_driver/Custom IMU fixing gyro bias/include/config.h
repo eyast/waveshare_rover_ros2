@@ -279,5 +279,19 @@ extern unsigned long lastCmdRecvTime;
 // Timing
 extern unsigned long prev_time;
 
+// UART config
+extern bool imu_stream_enabled;
+extern bool stream_as_json;
+
+
+// -----------------------------------------------------------------------------
+// IMU State
+// -----------------------------------------------------------------------------
+
+
+extern uint32_t last_update_us;
+extern uint32_t last_update_ina;
+
+
 
 #endif // CONFIG_H

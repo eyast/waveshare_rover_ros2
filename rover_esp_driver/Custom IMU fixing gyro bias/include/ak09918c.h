@@ -3,6 +3,8 @@
 
 #include <Arduino.h>
 
+extern bool mag_ok;
+
 // =============================================================================
 // AK09918C Register Definitions
 // =============================================================================
@@ -75,5 +77,7 @@ private:
     // Axis sign corrections (default: no correction)
     int8_t axis_sign_[3] = {1, 1, 1};
 };
+
+extern AK09918C mag;
 
 #endif // AK09918C_H
