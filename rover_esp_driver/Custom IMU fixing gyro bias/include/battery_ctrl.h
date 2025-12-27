@@ -1,3 +1,6 @@
+#include "json_cmd.h"
+#include "ugv_config.h"
+
 #define INA219_ADDRESS 0x42
 INA219_WE ina219 = INA219_WE(INA219_ADDRESS);
 
@@ -26,3 +29,27 @@ void inaDataUpdate(){
   loadVoltage_V  = busVoltage_V + (shuntVoltage_mV/1000);
   ina219_overflow = ina219.getOverflow();
 }
+
+// baseInfoFeedback.
+void baseInfoFeedback() {
+	static unsigned long last_feedback_time;
+	if (millis() - last_feedback_time < feedbackFlowExtraDelay) {
+		return;
+	}
+	
+	last_feedback_time = millis();
+
+	jsonInfoHttp.clear();
+	jsonInfoHttp["T"] = FEEDBACK_BASE_INFO;
+	//jsonInfoHttp["temp"] = temp;
+	jsonInfoHttp["mW"] = power_mW;
+	jsonInfoHttp["curr_mA"] = current_mA;
+	jsonInfoHttp["busv"] = busVoltage_V;
+	jsonInfoHttp["shuntv"] = shuntVoltage_mV;
+	jsonInfoHttp["v"] = loadVoltage_V;
+
+	String getInfoJsonString;
+	serializeJson(jsonInfoHttp, getInfoJsonString);
+	Serial.println(getInfoJsonString);
+}
+

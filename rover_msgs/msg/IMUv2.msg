@@ -1,8 +1,9 @@
 # IMUv2.msg
 std_msgs/Header header
-float32 pitch
-float32 roll
-float32 yaw
+float32 p
+float32 r
+float32 y
+float32 t
 float32 ax
 float32 ay
 float32 az

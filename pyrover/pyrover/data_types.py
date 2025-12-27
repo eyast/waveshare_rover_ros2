@@ -28,9 +28,10 @@ class IMUData_v2:
         - mag_x/y/z: raw ADC or microtesla (direction matters, magnitude varies)
         - temperature: Celsius
     """
-    roll: float = 0.0
-    pitch: float = 0.0
-    yaw: float = 0.0
+    r: float = 0.0
+    p: float = 0.0
+    y: float = 0.0
+    t: float = 0.0
     ax: float = 0.0
     ay: float = 0.0
     az: float = 0.0
@@ -49,9 +50,10 @@ class IMUData_v2:
         The rover returns JSON with abbreviated keys.
         """
         return cls(   
-            roll=data.get('roll', 0.0),
-            pitch=data.get('pitch', 0.0),
-            yaw=data.get('yaw', 0.0),
+            r=data.get('r', 0.0),
+            p=data.get('p', 0.0),
+            y=data.get('y', 0.0),
+            t=data.get('t', 0.0),
             ax=data["a"][0],
             ay=data["a"][1],
             az=data["a"][2],

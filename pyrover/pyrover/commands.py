@@ -131,15 +131,21 @@ class CommandType(IntEnum):
     """
 
     # =========================================================================
-    # MEssage Format
+    # Message Format / IMU
     # =========================================================================
+    IMU_STREAMING = 325
+    """
+    Enable / Disable Streaming
+    
+    Format: {"T":325, "cmd":1}
+    """
+    
     IMU_TYPE = 400
     """
     Sets the IMU stream format.
     
-    Format: {"T":325, "cmd":1}
+    Format: {"T":400, "cmd":1}
     """
-
 
     WIFI = 500
     """
@@ -163,13 +169,14 @@ class CommandType(IntEnum):
     Format: {"T":502}
     """
 
-
     WS_STOP = 503
     """
     Stop streaming to WebSockets
 
     Format: {"T":503}
     """
+
+
 class ModuleType(IntEnum):
     """External module types for T=4 command."""
     NONE = 0

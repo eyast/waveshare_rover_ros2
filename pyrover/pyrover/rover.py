@@ -264,6 +264,24 @@ class PyRover:
         else:
             return None
 
+    def imu_stream_json(self, isJson: bool) -> None:
+        """
+        Stream IMU data in JSON format.
+        """
+        self.send_command({
+            "T": CommandType.IMU_TYPE,
+            "cmd": 1 if isJson else 0
+        }, timeout=1)
+
+    def imu_stream(self, stream: bool) -> None:
+        """
+        Start / Stop streaming IMU data.
+        """
+        self.send_command({
+            "T": CommandType.IMU_STREAMING,
+            "cmd": 1 if stream else 0 
+        }, timeout=1)
+
     def start_ws_streaming(self) -> Optional[Dict]:
         """Starts WebSockets streaming."""
 

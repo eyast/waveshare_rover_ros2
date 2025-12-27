@@ -128,14 +128,15 @@ class RoverController(Node):
         Wheel, '/sensor/Wheel', 10)
 
     def _esp_callback(self, message):
-        try:
-            temp_imu = IMUData_v2.from_dict(message)
-            temp_imu= to_ros_msg(self, temp_imu)
-            self.imu_pub.publish(temp_imu)
-        except Exception as e:
-            self.get_logger().debug(f"IMU poll error: {e}")
+        reply = message.get("T", False)
+        if reply == "imu":
+            try:
+                temp_imu = IMUData_v2.from_dict(message)
+                temp_imu= to_ros_msg(self, temp_imu)
+                self.imu_pub.publish(temp_imu)
+            except Exception as e:
+                self.get_logger().debug(f"IMU poll error: {e}")
 
-    
     def _connect_robot(self):
         """Connect to the PyRover."""
         try:
@@ -145,7 +146,8 @@ class RoverController(Node):
                 callback=self._esp_callback # type: ignore
             )
             self.rover.connect()
-            self.rover.set_imu_stream(True)
+            self.rover.imu_stream(True)
+            self.rover.imu_stream_json(True)
             self.get_logger().info(f"Connected to PyRover on {self.port}")
         except Exception as e:
             self.get_logger().error(f"Failed to connect: {e}")

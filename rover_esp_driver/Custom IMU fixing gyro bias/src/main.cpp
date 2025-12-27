@@ -22,6 +22,7 @@ JsonDocument jsonCmdReceive;
 JsonDocument jsonInfoSend;
 JsonDocument jsonInfoHttp;
 
+#include <SCServo.h>
 #include <Adafruit_SSD1306.h>
 #include "qmi8658c.h"
 #include "ak09918c.h"
@@ -54,6 +55,7 @@ MagCalibrationReceiver cal_receiver;
 bool imu_ok = false;
 bool mag_ok = false;
 uint32_t last_update_us = 0;
+uint32_t last_update_ina = 0;
 
 // -----------------------------------------------------------------------------
 // IMU Streaming
@@ -234,4 +236,5 @@ void loop() {
     sendIMUStreamData();
     oledInfoUpdate();
     heartBeatCtrl();
+    inaDataUpdate();
 }
