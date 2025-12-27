@@ -29,7 +29,7 @@
 // =============================================================================
 // Calibration performed with MotionCal
 // =============================================================================
-// commented values were perfect (no onboard computer)
+// commented values were perfect (with onboard computer)
 #define HARDCODED_MAG_OFFSET_X  34.00f //25.15f
 #define HARDCODED_MAG_OFFSET_Y -35.76f //-56.42f
 #define HARDCODED_MAG_OFFSET_Z  -31.99f  //-27.62f
