@@ -22,6 +22,7 @@ JsonDocument jsonCmdReceive;
 JsonDocument jsonInfoSend;
 JsonDocument jsonInfoHttp;
 
+#include <SCServo.h>
 #include <Adafruit_SSD1306.h>
 #include "qmi8658c.h"
 #include "ak09918c.h"

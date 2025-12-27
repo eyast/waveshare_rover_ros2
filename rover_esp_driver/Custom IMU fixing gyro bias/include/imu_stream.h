@@ -45,6 +45,11 @@ static uint32_t debug_counter = 0;
 #endif
 
 // =============================================================================
+// TEMPERATURE
+// =============================================================================
+float temp;
+
+// =============================================================================
 // Update IMU Filter
 // =============================================================================
 void updateIMUFilter() {
@@ -66,6 +71,7 @@ void updateIMUFilter() {
 
         const QMI8658C_Data& imu_data = imu.get_data();
         const AK09918C_Data& mag_data = mag.get_data();
+        temp = temperatureRead();
 
 #if IMU_DEBUG_FILTER_INPUT
         if (++debug_counter % 250 == 0) {
@@ -79,6 +85,8 @@ void updateIMUFilter() {
             Serial.print(mag_data.mag[0], 1); Serial.print(",");
             Serial.print(mag_data.mag[1], 1); Serial.print(",");
             Serial.print(mag_data.mag[2], 1); Serial.println(")");
+            Serial.print("Temp");
+            Serial.print(temp, 3); Serial1.print();
         }
 #endif
 
@@ -123,9 +131,10 @@ void sendIMUStreamData() {
         // Using a static JSON document to avoid repeated allocation
         StaticJsonDocument<384> doc;
         doc["T"] = "imu";
-        doc["yaw"] = filter.get_yaw();
-        doc["pitch"] = filter.get_pitch();
-        doc["roll"] = filter.get_roll();
+        doc["y"] = filter.get_yaw();
+        doc["p"] = filter.get_pitch();
+        doc["r"] = filter.get_roll();
+        doc["t"] = temp;
         
         JsonArray a = doc.createNestedArray("a");
         a.add(imu_data.accel[0]);
