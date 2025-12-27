@@ -18,28 +18,20 @@
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
 #include "websockets.h"
-JsonDocument jsonCmdReceive;
-JsonDocument jsonInfoSend;
-JsonDocument jsonInfoHttp;
-
 #include <SCServo.h>
 #include <Adafruit_SSD1306.h>
 #include "qmi8658c.h"
 #include "ak09918c.h"
 #include "madgwick.h"
-#include "mag_calibration.h"
 #include "config.h"
 QMI8658C imu(QMI8658C_ADDR);
 AK09918C mag(AK09918C_ADDR);
 MadgwickFilter filter(MADGWICK_BETA);
-MagCalibrationReceiver cal_receiver;
 
 #include <INA219_WE.h>
 #include <PID_v2.h>
 #include "battery_ctrl.h"
 #include "oled_ctrl.h"
-#include "ugv_config.h"
-#include "json_cmd.h"
 #include "motors.h"
 #include "imu_stream.h"
 #include "uart_ctrl.h"
@@ -225,6 +217,7 @@ void setup() {
 // Main Loop
 // =============================================================================
 void loop() {
+    lastCmdRecvTime = millis(); 
     serialCtrl();
     webSocket.loop();
     updateIMUFilter();

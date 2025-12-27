@@ -1,6 +1,15 @@
 #ifndef CONFIG_H
 #define CONFIG_H
 
+#include <Arduino.h>
+#include <ArduinoJson.h>
+
+// =========================
+// Devices
+//============================
+extern JsonDocument jsonCmdReceive;
+extern JsonDocument jsonInfoSend;
+extern JsonDocument jsonInfoHttp;
 // =============================================================================
 // Hardware Configuration
 // =============================================================================
@@ -82,13 +91,44 @@
 #define CMD_REBOOT          600
 #define CMD_MM_TYPE_SET     900
 
-// IMU Stream commands (existing - from json_cmd.h)
-#define CMD_IMU_STREAM_CTRL 325   // {"T":325,"cmd":1}
-#define CMD_STREAM_FORMAT   400   // {"T":400,"cmd":1}
+// Not sure what they are, investigate
+#define FEEDBACK_IMU_DATA   1002
+
+// MODULE TYPE
+// 0: nothing
+// 1: RoArm-M2-S
+// 2: Gimbal
+// {"T":4,"cmd":0}
+#define CMD_MODULE_TYPE	4
+
+// =============================================================================
+// Motor Control
+// =============================================================================
+
+// CHANGE HEART BEAT DELAY
+// {"T":136,"cmd":3000}
+#define CMD_HEART_BEAT_SET	136
+
+// SET SPEED RATE
+// {"T":138,"L":1,"R":1}
+#define CMD_SET_SPD_RATE	138
+
+// GET SPEED RATE
+// {"T":139}
+#define CMD_GET_SPD_RATE	139
+
+// SAVE SPEED RATE
+// {"T":140}
+#define CMD_SAVE_SPD_RATE	140
 
 // =============================================================================
 // IMU Control Commands (330-360 range)
 // =============================================================================
+
+// IMU Stream commands (existing - from json_cmd.h)
+#define CMD_IMU_STREAM_CTRL 325   // {"T":325,"cmd":1}
+#define CMD_STREAM_FORMAT   400   // {"T":400,"cmd":1}
+// 
 
 // Calibration commands
 #define CMD_IMU_CALIBRATE_GYRO   330   // {"T":330}
@@ -131,5 +171,113 @@
 
 // Get filter convergence status
 #define CMD_IMU_CONVERGENCE_STATUS 354   // {"T":354} -> {"T":354,"rate":0.01,"converged":true,"active_beta":0.1}
+
+// =============================================================================
+// WiFi and Websockets
+// =============================================================================
+
+// WIFI AP settings (note: lower case 'ssid' and 'pass')
+// {"T": 500, "ssid": "abc", "pass": "password"}
+#define CMD_WIFI                500
+
+// GET STATUS OF WEBSOCKETS
+// {"T": 502}
+#define WS_STATUS               501
+
+// START STREAMING WEBSOCKETS
+// {"T": 503}
+#define WS_START                502
+
+// STOP STREAMING WEBSOCKETS
+// {"T": 504}
+#define WS_STOP                 503
+
+// =============================================================================
+// System replies
+// =============================================================================
+
+// IMU stream data response type
+// {"T":326,"ax":...,"ay":...,...}
+#define FEEDBACK_IMU_STREAM    326
+
+#define FEEDBACK_BASE_INFO  1001
+
+// =============================================================================
+// Motor Driver Pins
+// =============================================================================
+
+#define PWMA    25      // Motor A PWM
+#define AIN2    17      // Motor A input 2
+#define AIN1    21      // Motor A input 1
+#define BIN1    22      // Motor B input 1
+#define BIN2    23      // Motor B input 2
+#define PWMB    26      // Motor B PWM
+
+// =============================================================================
+// UGV Base Parameters
+// =============================================================================
+
+#define THRESHOLD_PWM   23
+
+// =============================================================================
+// Heartbeat / Safety
+// =============================================================================
+
+#define SERVO_STOP_DELAY    3
+
+// =============================================================================
+// Compile-time Constants (safe in headers)
+// =============================================================================
+
+constexpr uint16_t ANALOG_WRITE_BITS = 8;
+constexpr uint16_t MAX_PWM = (1 << ANALOG_WRITE_BITS) - 1;  // 255
+constexpr uint16_t MIN_PWM = MAX_PWM / 4;                    // 63
+
+// =============================================================================
+// Global Variables (extern declarations - defined in config.cpp)
+// =============================================================================
+
+// Debug & Info Settings
+// 0: no debug output, 1: print debug info (default), 2: flow feedback
+extern byte InfoPrint;
+
+// Platform Type Configuration
+// 1: WAVE ROVER, 2: UGV02 (UGV Rover), 3: UGV01 (UGV Beast)
+extern byte mainType;
+
+// 0: Base (no arm/gimbal), 1: RoArm-M2, 2: Gimbal
+extern byte moduleType;
+
+// Run new JSON command flag
+extern bool runNewJsonCmd;
+
+// PWM channel configuration
+extern int freq;
+extern int channel_A;
+extern int channel_B;
+
+// Motor PID Configuration
+extern float __kp;
+extern float __ki;
+extern float __kd;
+extern float windup_limits;
+
+// UGV Base Parameters (defaults for WAVE ROVER)
+extern double WHEEL_D;
+extern int ONE_CIRCLE_PLUSES;
+extern double TRACK_WIDTH;
+extern bool SET_MOTOR_DIR;
+
+// Communication Settings
+extern int feedbackFlowExtraDelay;
+extern bool uartCmdEcho;
+
+// Heartbeat / Safety
+extern int HEART_BEAT_DELAY;
+extern unsigned long lastCmdRecvTime;
+
+// Timing
+extern unsigned long prev_time;
+
 
 #endif // CONFIG_H
