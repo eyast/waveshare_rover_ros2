@@ -42,6 +42,14 @@ class IMUData_v2:
     my: int = 0
     mz: int = 0
 
+    def imu_is_empty(self):
+        """
+        Determines if an IMU message does not contain
+        roll, pitch or yaw.
+        """
+
+        return self.r == self.p == self.y == 0.0
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'IMUData_v2':
         """

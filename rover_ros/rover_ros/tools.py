@@ -39,3 +39,30 @@ def to_ros_msg(ros_node, data: IMUData_v2) -> IMUv2:
     except Exception as e:
         ros_node.get_logger().debug(f"Transforming IMUv2 class to ros message failed:{e}")
     return IMUv2()
+
+
+class MessageCallback:
+    """
+    Hardware Message Processor
+
+    :param parent: ROS2 parent node.
+    """
+    def __init__(self, parent):
+        self.parent = parent
+
+    def process(self, message):
+        """
+        Publishes Hardware data to the appropriate
+        topic.
+        
+        :param message: Message to be processed
+        """
+        reply = message.get("T", False)
+        if reply == "imu":
+            try:
+                temp_imu = IMUData_v2.from_dict(message)
+                if not temp_imu.is_empty():
+                    temp_imu= to_ros_msg(self, temp_imu)
+                    self.parent.imu_pub.publish(temp_imu)
+            except Exception as e:
+                self.parent.get_logger().debug(f"IMU poll error: {e}")

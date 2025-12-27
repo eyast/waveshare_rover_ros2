@@ -26,8 +26,6 @@ sensor/Temperature (rover_msgs/Temperature)
 sensor/Battery (rover_msgs/Battery)
     Battery level, in percentage
 
-sensor/Wheel (rover_msgs/Wheel)
-    Left and Right Wheel speeds, expressed as m/s. Capped at 0.5 max.
 
 Parameters
 ----------
@@ -49,7 +47,7 @@ from rover_msgs.msg import (
     Battery,
     Wheel
 )
-from rover_ros import to_ros_msg
+from rover_ros import MessageCallback
 
 
 class RoverController(Node):
@@ -127,15 +125,8 @@ class RoverController(Node):
         self.wheel_pub = self.create_publisher(
         Wheel, '/sensor/Wheel', 10)
 
-    def _esp_callback(self, message):
-        reply = message.get("T", False)
-        if reply == "imu":
-            try:
-                temp_imu = IMUData_v2.from_dict(message)
-                temp_imu= to_ros_msg(self, temp_imu)
-                self.imu_pub.publish(temp_imu)
-            except Exception as e:
-                self.get_logger().debug(f"IMU poll error: {e}")
+        # ===== HW callback function ===
+        self._cb = MessageCallback(self)
 
     def _connect_robot(self):
         """Connect to the PyRover."""
@@ -143,7 +134,7 @@ class RoverController(Node):
             self.rover = PyRover(
                 port=self.port, # type: ignore
                 baudrate=self.baudrate,
-                callback=self._esp_callback # type: ignore
+                callback=self._cb.process # type: ignore
             )
             self.rover.connect()
             self.rover.imu_stream(True)
