@@ -85,7 +85,6 @@ extern JsonDocument jsonInfoHttp;
 
 // OLED commands (existing)
 #define CMD_OLED_CTRL       3
-#define CMD_OLED_DEFAULT    -3
 
 // System commands (existing)
 #define CMD_REBOOT          600
@@ -144,10 +143,8 @@ extern JsonDocument jsonInfoHttp;
 
 // Debug/status commands
 #define CMD_IMU_DEBUG            345   // {"T":345}
-#define CMD_IMU_GET_STATUS       346   // {"T":346}
+//#define CMD_IMU_GET_STATUS       346   // {"T":346}
 
-// Orientation query
-#define CMD_IMU_GET_ORIENTATION  350   // {"T":350} -> {"T":350,"yaw":x,"pitch":y,"roll":z}
 
 // =============================================================================
 // NEW: Fast Initialization & Adaptive Beta Commands (351-360)
@@ -239,7 +236,7 @@ constexpr uint16_t MIN_PWM = MAX_PWM / 4;                    // 63
 
 // Debug & Info Settings
 // 0: no debug output, 1: print debug info (default), 2: flow feedback
-extern byte InfoPrint;
+//extern byte InfoPrint;
 
 // Platform Type Configuration
 // 1: WAVE ROVER, 2: UGV02 (UGV Rover), 3: UGV01 (UGV Beast)
@@ -249,7 +246,7 @@ extern byte mainType;
 extern byte moduleType;
 
 // Run new JSON command flag
-extern bool runNewJsonCmd;
+//extern bool runNewJsonCmd;
 
 // PWM channel configuration
 extern int freq;
@@ -291,7 +288,6 @@ extern bool stream_as_json;
 
 extern uint32_t last_update_us;
 extern uint32_t last_update_ina;
-
 
 
 #endif // CONFIG_H

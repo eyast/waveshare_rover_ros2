@@ -49,10 +49,6 @@ void jsonCmdReceiveHandler() {
         oledCtrl(jsonCmdReceive["lineNum"], jsonCmdReceive["Text"]);
         break;
 
-    case CMD_OLED_DEFAULT:
-        setOledDefault();
-        break;
-
     // --- IMU Streaming ---
 
     case CMD_IMU_STREAM_CTRL:
@@ -227,52 +223,40 @@ void jsonCmdReceiveHandler() {
         break;
     }
 
-    case CMD_IMU_GET_STATUS: {
-        // {"T":346} -> returns full status as JSON
-        const QMI8658C_Data& imu_data = imu.get_data();
-        const AK09918C_Data& mag_data = mag.get_data();
+    // case CMD_IMU_GET_STATUS: {
+    //     // {"T":346} -> returns full status as JSON
+    //     const QMI8658C_Data& imu_data = imu.get_data();
+    //     const AK09918C_Data& mag_data = mag.get_data();
         
-        jsonInfoSend.clear();
-        jsonInfoSend["T"] = CMD_IMU_GET_STATUS;
+    //     jsonInfoSend.clear();
+    //     jsonInfoSend["T"] = CMD_IMU_GET_STATUS;
         
-        JsonArray accel = jsonInfoSend.createNestedArray("accel");
-        accel.add(imu_data.accel[0]);
-        accel.add(imu_data.accel[1]);
-        accel.add(imu_data.accel[2]);
+    //     JsonArray accel = jsonInfoSend.createNestedArray("accel");
+    //     accel.add(imu_data.accel[0]);
+    //     accel.add(imu_data.accel[1]);
+    //     accel.add(imu_data.accel[2]);
         
-        JsonArray gyro = jsonInfoSend.createNestedArray("gyro_dps");
-        gyro.add(imu_data.gyro_dps[0]);
-        gyro.add(imu_data.gyro_dps[1]);
-        gyro.add(imu_data.gyro_dps[2]);
+    //     JsonArray gyro = jsonInfoSend.createNestedArray("gyro_dps");
+    //     gyro.add(imu_data.gyro_dps[0]);
+    //     gyro.add(imu_data.gyro_dps[1]);
+    //     gyro.add(imu_data.gyro_dps[2]);
         
-        JsonArray mag_arr = jsonInfoSend.createNestedArray("mag");
-        mag_arr.add(mag_data.mag[0]);
-        mag_arr.add(mag_data.mag[1]);
-        mag_arr.add(mag_data.mag[2]);
+    //     JsonArray mag_arr = jsonInfoSend.createNestedArray("mag");
+    //     mag_arr.add(mag_data.mag[0]);
+    //     mag_arr.add(mag_data.mag[1]);
+    //     mag_arr.add(mag_data.mag[2]);
         
-        float mag_h = sqrtf(mag_data.mag[0]*mag_data.mag[0] + mag_data.mag[1]*mag_data.mag[1]);
-        float dip = atan2f(mag_data.mag[2], mag_h) * 180.0f / PI;
-        jsonInfoSend["mag_dip"] = dip;
-        jsonInfoSend["beta"] = filter.get_base_beta();
-        jsonInfoSend["active_beta"] = filter.get_active_beta();
+    //     float mag_h = sqrtf(mag_data.mag[0]*mag_data.mag[0] + mag_data.mag[1]*mag_data.mag[1]);
+    //     float dip = atan2f(mag_data.mag[2], mag_h) * 180.0f / PI;
+    //     jsonInfoSend["mag_dip"] = dip;
+    //     jsonInfoSend["beta"] = filter.get_base_beta();
+    //     jsonInfoSend["active_beta"] = filter.get_active_beta();
         
-        serializeJson(jsonInfoSend, Serial);
-        Serial.println();
-        break;
-    }
+    //     serializeJson(jsonInfoSend, Serial);
+    //     Serial.println();
+    //     break;
+    // }
 
-    // --- Orientation Query (350) ---
-
-    case CMD_IMU_GET_ORIENTATION:
-        // {"T":350} -> returns {"T":350,"yaw":x,"pitch":y,"roll":z}
-        jsonInfoSend.clear();
-        jsonInfoSend["T"] = CMD_IMU_GET_ORIENTATION;
-        jsonInfoSend["yaw"] = filter.get_yaw();
-        jsonInfoSend["pitch"] = filter.get_pitch();
-        jsonInfoSend["roll"] = filter.get_roll();
-        serializeJson(jsonInfoSend, Serial);
-        Serial.println();
-        break;
 
     // =========================================================================
     // NEW: Fast Initialization & Adaptive Beta Commands (351-354)
@@ -421,13 +405,11 @@ void jsonCmdReceiveHandler() {
     //  {"T": 502}
     case WS_START:
         wssendingEnabled = true;
-        wsStatus();
         break;
 
     //  {"T": 503}
     case WS_STOP:
         wssendingEnabled = false;
-        wsStatus();
         break;
     }
 }
@@ -447,7 +429,7 @@ void serialCtrl() {
             DeserializationError err = deserializeJson(jsonCmdReceive, receivedData);
 
             if (err == DeserializationError::Ok) {
-                if (InfoPrint == 1 && uartCmdEcho) {
+                if (uartCmdEcho) {
                     Serial.print(receivedData);
                 }
                 jsonCmdReceiveHandler();

@@ -105,3 +105,4 @@ void AK09918C::set_axis_signs(int8_t x_sign, int8_t y_sign, int8_t z_sign) {
     Serial.print(" Z=");
     Serial.println(axis_sign_[2]);
 }
+

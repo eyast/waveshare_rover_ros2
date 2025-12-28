@@ -61,7 +61,6 @@ void oledInfoUpdate() {
   if (!screenDefaultMode) {
     return;
   }
-  // inaDataUpdate();
   screenLine_3 = "V:"+String(loadVoltage_V);
   oled_update();
   
@@ -85,14 +84,5 @@ void oledCtrl(byte inputLineNum, String inputMegs) {
   display.println(customLine_3);
 
   display.display();
-}
-
-// set oled as default.
-void setOledDefault(){
-  screenDefaultMode = true;
-  inaDataUpdate();
-  screenLine_3 = "V:"+String(loadVoltage_V);
-  oled_update();
-  lastTimeMillis = currentTimeMillis;
 }
 

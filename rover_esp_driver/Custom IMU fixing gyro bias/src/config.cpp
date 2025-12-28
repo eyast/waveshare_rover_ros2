@@ -6,7 +6,7 @@
 
 // Debug & Info Settings
 // 0: no debug output, 1: print debug info (default), 2: flow feedback
-byte InfoPrint = 1;
+//byte InfoPrint = 1;
 
 // Platform Type Configuration
 // 1: WAVE ROVER, 2: UGV02 (UGV Rover), 3: UGV01 (UGV Beast)
@@ -16,7 +16,7 @@ byte mainType = 1;
 byte moduleType = 0;
 
 // Run new JSON command flag
-bool runNewJsonCmd = false;
+//bool runNewJsonCmd = false;
 
 // PWM channel configuration
 int freq = 100000;
@@ -37,7 +37,7 @@ bool SET_MOTOR_DIR = false;
 
 // Communication Settings
 int feedbackFlowExtraDelay = 0;
-bool uartCmdEcho = true;
+bool uartCmdEcho = false;
 
 // Heartbeat / Safety
 int HEART_BEAT_DELAY = 3000;

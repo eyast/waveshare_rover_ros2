@@ -29,4 +29,3 @@ void init_oled();
 void oled_update();
 void oledInfoUpdate();
 void oledCtrl(byte, String);
-void setOledDefault();

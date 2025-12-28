@@ -1,4 +1,6 @@
 #include "websockets.h"
+#include <WiFi.h>
+#include <WebSocketsClient.h>
 
 // Variable definitions (actual storage allocated HERE, once)
 WebSocketsClient webSocket;
