@@ -8,6 +8,7 @@
 #include "sensors.h"
 #include "madgwick.h"
 #include "websocket.h"
+#include "oled.h"
 
 // Command buffer
 static char cmd_buffer[128];

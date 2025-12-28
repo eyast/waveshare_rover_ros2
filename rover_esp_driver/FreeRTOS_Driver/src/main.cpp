@@ -18,6 +18,7 @@
 #include <Arduino.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/semphr.h"
 #include "esp_task_wdt.h"
 
 #include "config.h"
@@ -27,6 +28,7 @@
 #include "motors.h"
 #include "commands.h"
 #include "websocket.h"
+#include "oled.h"
 
 // =============================================================================
 // Task Handles
@@ -188,6 +190,10 @@ static void power_task(void* param) {
         // Read power monitor
         pwr.read();
         
+        // Update OLED with power data
+        const PWR_Data& data = pwr.data();
+        oled_set_power(data.load_voltage_V, data.current_mA, data.power_mW);
+        
         // Check motor timeout
         motors_check_timeout();
         
@@ -195,7 +201,6 @@ static void power_task(void* param) {
         telem_counter++;
         if (protocol_get_streaming() && (telem_counter >= (TELEM_INTERVAL_POWER_MS / PERIOD_POWER_MS))) {
             telem_counter = 0;
-            const PWR_Data& data = pwr.data();
             out_power(data.load_voltage_V, data.current_mA, data.power_mW, data.shunt_voltage_mV);
         }
         
@@ -243,6 +248,7 @@ void setup() {
     motors_init();
     commands_init();
     websocket_init();
+    oled_init();  // Initialize OLED (shows splash screen)
     
     // Initialize filter from sensor readings
     if (sensors_imu_ok()) {
