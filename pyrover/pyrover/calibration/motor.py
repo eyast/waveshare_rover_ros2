@@ -1,45 +1,23 @@
 """
-Motor Gain Calibration
-======================
+Motor Gain Calibration (New Line-Based Protocol)
+=================================================
 
-The PyRover uses differential drive without wheel encoders. This means
-we can't measure actual wheel speeds - we only know what PWM values we send.
-To convert velocity commands (m/s, rad/s) to PWM, we need calibration gains.
+The PyRover uses differential drive without wheel encoders. This calibration
+tool helps determine the relationship between PWM values and actual motion.
 
 The Problem
 -----------
-When you command "move at 0.3 m/s", how fast does the robot actually move?
-Without encoders, we don't know. Factors that affect this:
-
-1. **Motor characteristics** - Voltage, load, temperature
-2. **Battery level** - Lower voltage = slower speeds  
-3. **Surface friction** - Carpet vs tile vs concrete
-4. **Weight distribution** - Payload affects acceleration
+When you send `M:100,100`, how fast does the robot actually move?
+Factors that affect this:
+- Motor characteristics, battery level, surface friction, weight
 
 The Solution: Empirical Calibration
 -----------------------------------
-We run the robot at known command values, measure actual motion, and compute
-correction gains:
+Run the robot at known PWM values, measure actual motion, and compute
+conversion factors:
 
-    actual_speed = commanded_speed * linear_gain
-    actual_angular = commanded_angular * angular_gain
-
-L-Shaped Calibration Pattern
-----------------------------
-The calibration runs an "L" pattern:
-
-    1. Drive forward for T seconds at speed V
-       → Measure actual distance traveled (D_actual)
-       → linear_gain = D_actual / (V * T)
-       
-    2. Rotate in place for T seconds at angular speed W
-       → Measure actual rotation (θ_actual in degrees)
-       → angular_gain = θ_actual / (W * T * 180/π)
-
-Why L-Shape?
-    - Tests linear and angular motion independently
-    - Easy to mark start/end positions on floor
-    - Rotation test shows any differential imbalance
+    actual_speed_mps = pwm_value * linear_factor
+    actual_angular_rps = pwm_value * angular_factor
 
 Usage Example
 -------------
@@ -51,22 +29,13 @@ Usage Example
 ...     
 ...     # Run linear test
 ...     print("Robot will drive forward...")
-...     result = calibrator.run_linear_test(speed=0.3, duration=2.0)
+...     result = calibrator.run_linear_test(pwm=100, duration=2.0)
 ...     
 ...     # User measures and inputs actual distance
 ...     measured = float(input("Measured distance (m): "))
-...     linear_gain = result.compute_gain(measured)
+...     linear_factor = result.compute_factor(measured)
 ...     
-...     # Run angular test
-...     print("Robot will rotate in place...")
-...     result = calibrator.run_angular_test(speed=0.5, duration=2.0)
-...     
-...     # User measures rotation
-...     degrees = float(input("Measured rotation (degrees): "))
-...     angular_gain = result.compute_gain(degrees)
-...     
-...     print(f"Linear gain: {linear_gain:.3f}")
-...     print(f"Angular gain: {angular_gain:.3f}")
+...     print(f"Linear factor: {linear_factor:.6f} m/s per PWM unit")
 """
 
 import time
@@ -85,36 +54,23 @@ class LinearCalibrationResult:
     
     Attributes
     ----------
-    commanded_speed : float
-        The speed that was commanded (m/s equivalent)
+    pwm_value : int
+        The PWM value that was commanded (-255 to 255)
     duration : float
         How long the test ran (seconds)
-    expected_distance : float
-        Distance we'd expect if gain were 1.0
     measured_distance : float or None
-        User-measured actual distance (set via compute_gain)
-    computed_gain : float or None
-        Calculated gain correction
-        
-    Example
-    -------
-    >>> result = calibrator.run_linear_test(0.3, 2.0)
-    >>> print(f"Expected {result.expected_distance:.2f} m at gain=1.0")
-    >>> gain = result.compute_gain(measured_distance=0.48)
-    >>> print(f"Actual gain: {gain:.3f}")
+        User-measured actual distance (set via compute_factor)
+    computed_factor : float or None
+        Calculated factor: m/s per PWM unit
     """
-    commanded_speed: float
+    pwm_value: int
     duration: float
-    expected_distance: float = field(init=False)
     measured_distance: Optional[float] = None
-    computed_gain: Optional[float] = None
+    computed_factor: Optional[float] = None
     
-    def __post_init__(self):
-        self.expected_distance = self.commanded_speed * self.duration
-        
-    def compute_gain(self, measured_distance: float) -> float:
+    def compute_factor(self, measured_distance: float) -> float:
         """
-        Compute the linear gain from measured distance.
+        Compute the linear factor from measured distance.
         
         Parameters
         ----------
@@ -124,22 +80,21 @@ class LinearCalibrationResult:
         Returns
         -------
         float
-            Gain correction factor. Multiply commanded speed by this
-            to get actual speed.
+            Factor in m/s per PWM unit.
             
         Notes
         -----
-        gain = measured / expected = measured / (speed * time)
+        factor = (distance / time) / pwm = velocity / pwm
         
-        If gain > 1.0: Robot moves faster than commanded
-        If gain < 1.0: Robot moves slower than commanded
+        Usage: actual_velocity = pwm * factor
         """
         self.measured_distance = measured_distance
-        if self.expected_distance > 0:
-            self.computed_gain = measured_distance / self.expected_distance
+        if self.pwm_value != 0 and self.duration > 0:
+            velocity = measured_distance / self.duration
+            self.computed_factor = velocity / abs(self.pwm_value)
         else:
-            self.computed_gain = 1.0
-        return self.computed_gain
+            self.computed_factor = 0.0
+        return self.computed_factor
 
 
 @dataclass 
@@ -147,33 +102,18 @@ class AngularCalibrationResult:
     """
     Result of an angular motion calibration test.
     
-    Attributes
-    ----------
-    commanded_angular_speed : float
-        The angular speed that was commanded (rad/s equivalent)
-    duration : float
-        How long the test ran (seconds)
-    expected_rotation_deg : float
-        Degrees we'd expect if gain were 1.0
-    measured_rotation_deg : float or None
-        User-measured actual rotation in degrees
-    computed_gain : float or None
-        Calculated gain correction
+    For differential drive rotation:
+    - Left motor: -pwm, Right motor: +pwm
+    - This produces counterclockwise rotation
     """
-    commanded_angular_speed: float
+    pwm_value: int
     duration: float
-    expected_rotation_deg: float = field(init=False)
     measured_rotation_deg: Optional[float] = None
-    computed_gain: Optional[float] = None
+    computed_factor: Optional[float] = None
     
-    def __post_init__(self):
-        # Convert rad/s * s -> rad -> degrees
-        expected_rad = self.commanded_angular_speed * self.duration
-        self.expected_rotation_deg = math.degrees(expected_rad)
-        
-    def compute_gain(self, measured_rotation_deg: float) -> float:
+    def compute_factor(self, measured_rotation_deg: float) -> float:
         """
-        Compute the angular gain from measured rotation.
+        Compute the angular factor from measured rotation.
         
         Parameters
         ----------
@@ -183,14 +123,17 @@ class AngularCalibrationResult:
         Returns
         -------
         float
-            Gain correction factor.
+            Factor in rad/s per PWM unit.
         """
         self.measured_rotation_deg = measured_rotation_deg
-        if abs(self.expected_rotation_deg) > 0.1:
-            self.computed_gain = measured_rotation_deg / self.expected_rotation_deg
+        if self.pwm_value != 0 and self.duration > 0:
+            # Convert degrees to radians
+            rotation_rad = math.radians(measured_rotation_deg)
+            angular_velocity = rotation_rad / self.duration
+            self.computed_factor = angular_velocity / abs(self.pwm_value)
         else:
-            self.computed_gain = 1.0
-        return self.computed_gain
+            self.computed_factor = 0.0
+        return self.computed_factor
 
 
 @dataclass
@@ -200,56 +143,77 @@ class FullCalibrationResult:
     
     Attributes
     ----------
+    linear_factor : float
+        m/s per PWM unit
+    angular_factor : float
+        rad/s per PWM unit
     linear_gain : float
-        Multiply linear commands by this
+        For ROS2: converts m/s command to PWM (1/linear_factor * 255)
     angular_gain : float
-        Multiply angular commands by this
-    linear_result : LinearCalibrationResult
-        Details from linear test
-    angular_result : AngularCalibrationResult
-        Details from angular test
+        For ROS2: converts rad/s command to PWM (1/angular_factor * 255)
     """
-    linear_gain: float
-    angular_gain: float
+    linear_factor: float
+    angular_factor: float
     linear_result: LinearCalibrationResult
     angular_result: AngularCalibrationResult
     
+    @property
+    def linear_gain(self) -> float:
+        """ROS2 linear_gain parameter value."""
+        if self.linear_factor > 0:
+            # At PWM=255, what velocity do we get?
+            max_velocity = 255 * self.linear_factor
+            # So to get 1 m/s, we need PWM = 1/linear_factor
+            return 1.0 / self.linear_factor
+        return 200.0  # Default
+    
+    @property
+    def angular_gain(self) -> float:
+        """ROS2 angular_gain parameter value."""
+        if self.angular_factor > 0:
+            return 1.0 / self.angular_factor
+        return 100.0  # Default
+    
     def to_yaml(self) -> str:
-        """Generate YAML config snippet."""
+        """Generate YAML config snippet for ROS2."""
         return f"""# Motor calibration results
-# Generated by waveshare-calibrate-motors
+# Generated by pyrover-calibrate-motors
+#
+# Measured factors:
+#   Linear:  {self.linear_factor:.6f} m/s per PWM unit
+#   Angular: {self.angular_factor:.6f} rad/s per PWM unit
+#
 rover_node:
   ros__parameters:
-    linear_gain: {self.linear_gain:.4f}
-    angular_gain: {self.angular_gain:.4f}
+    linear_gain: {self.linear_gain:.1f}
+    angular_gain: {self.angular_gain:.1f}
+    max_speed: 255
 """
 
     def __str__(self) -> str:
         return (
             f"Calibration Results:\n"
-            f"  Linear gain:  {self.linear_gain:.4f}\n"
-            f"  Angular gain: {self.angular_gain:.4f}\n"
+            f"  Linear factor:  {self.linear_factor:.6f} m/s per PWM\n"
+            f"  Angular factor: {self.angular_factor:.6f} rad/s per PWM\n"
             f"\n"
-            f"Linear test:\n"
-            f"  Commanded: {self.linear_result.commanded_speed:.2f} m/s for "
-            f"{self.linear_result.duration:.1f}s\n"
-            f"  Expected:  {self.linear_result.expected_distance:.3f} m\n"
+            f"  ROS2 linear_gain:  {self.linear_gain:.1f}\n"
+            f"  ROS2 angular_gain: {self.angular_gain:.1f}\n"
+            f"\n"
+            f"Linear test (PWM={self.linear_result.pwm_value}):\n"
+            f"  Duration:  {self.linear_result.duration:.1f}s\n"
             f"  Measured:  {self.linear_result.measured_distance:.3f} m\n"
+            f"  Velocity:  {self.linear_result.measured_distance/self.linear_result.duration:.3f} m/s\n"
             f"\n"
-            f"Angular test:\n"
-            f"  Commanded: {self.angular_result.commanded_angular_speed:.2f} rad/s for "
-            f"{self.angular_result.duration:.1f}s\n"
-            f"  Expected:  {self.angular_result.expected_rotation_deg:.1f}°\n"
+            f"Angular test (PWM=±{self.angular_result.pwm_value}):\n"
+            f"  Duration:  {self.angular_result.duration:.1f}s\n"
             f"  Measured:  {self.angular_result.measured_rotation_deg:.1f}°\n"
+            f"  Angular:   {math.radians(self.angular_result.measured_rotation_deg)/self.angular_result.duration:.3f} rad/s\n"
         )
 
 
 class MotorCalibrator:
     """
-    Motor gain calibration tool for PyRover.
-    
-    Runs controlled movements and helps calculate gain corrections
-    based on measured actual motion.
+    Motor calibration tool for PyRover (PWM-based protocol).
     
     Parameters
     ----------
@@ -257,51 +221,25 @@ class MotorCalibrator:
         Connected rover instance
     countdown_seconds : int
         Countdown before each test (default 3)
-        
-    Example
-    -------
-    >>> with PyRover('/dev/serial0') as rover:
-    ...     cal = MotorCalibrator(rover)
-    ...     
-    ...     # Linear test
-    ...     result = cal.run_linear_test(0.3, 2.0)
-    ...     linear_gain = result.compute_gain(0.52)  # Measured 0.52m
-    ...     
-    ...     # Angular test  
-    ...     result = cal.run_angular_test(0.5, 2.0)
-    ...     angular_gain = result.compute_gain(95.0)  # Measured 95 degrees
     """
     
     def __init__(self, rover: 'PyRover', countdown_seconds: int = 3):
-        """
-        Initialize the motor calibrator.
-        
-        Parameters
-        ----------
-        rover : PyRover
-            Connected rover instance
-        countdown_seconds : int
-            Seconds to count down before each test
-        """
         self.rover = rover
         self.countdown_seconds = countdown_seconds
         
     def run_linear_test(
         self, 
-        speed: float = 0.3, 
+        pwm: int = 100, 
         duration: float = 2.0,
         verbose: bool = True
     ) -> LinearCalibrationResult:
         """
         Run a straight-line driving test.
         
-        The robot will drive forward at the specified speed for the
-        specified duration, then stop.
-        
         Parameters
         ----------
-        speed : float
-            Commanded speed (0 to 0.5, where 0.5 is full speed)
+        pwm : int
+            PWM value (0 to 255, where 255 is full speed)
         duration : float
             How long to drive in seconds
         verbose : bool
@@ -310,19 +248,15 @@ class MotorCalibrator:
         Returns
         -------
         LinearCalibrationResult
-            Contains expected distance. Call compute_gain() with
-            measured distance to get the gain.
-            
-        Notes
-        -----
-        Mark the robot's starting position before calling this method.
-        After the test, measure the distance from start to finish.
+            Call compute_factor() with measured distance to get the factor.
         """
+        pwm = abs(pwm)  # Ensure positive
+        
         if verbose:
             print(f"\n{'='*50}")
             print("LINEAR CALIBRATION TEST")
             print(f"{'='*50}")
-            print(f"\nWill drive at speed {speed:.2f} for {duration:.1f} seconds")
+            print(f"\nWill drive at PWM={pwm} for {duration:.1f} seconds")
             print("Mark the robot's starting position!")
             
         # Countdown
@@ -332,8 +266,8 @@ class MotorCalibrator:
                 time.sleep(1)
             print("  GO!")
             
-        # Execute movement
-        self.rover.move(speed, speed)  # Both motors same = straight
+        # Execute movement (both motors same = straight)
+        self.rover.move(pwm, pwm)
         time.sleep(duration)
         self.rover.stop()
         
@@ -341,32 +275,21 @@ class MotorCalibrator:
             print("  STOP!")
             print(f"\nMark the robot's ending position.")
         
-        result = LinearCalibrationResult(
-            commanded_speed=speed,
-            duration=duration
-        )
-        
-        if verbose:
-            print(f"Expected distance (at gain=1.0): {result.expected_distance:.3f} m")
-            
-        return result
+        return LinearCalibrationResult(pwm_value=pwm, duration=duration)
         
     def run_angular_test(
         self,
-        angular_speed: float = 0.5,
+        pwm: int = 100,
         duration: float = 2.0,
         verbose: bool = True
     ) -> AngularCalibrationResult:
         """
         Run a rotation-in-place test.
         
-        The robot will rotate counterclockwise at the specified angular
-        speed for the specified duration, then stop.
-        
         Parameters
         ----------
-        angular_speed : float
-            Commanded angular speed (higher = faster rotation)
+        pwm : int
+            PWM value (motors will be ±pwm)
         duration : float
             How long to rotate in seconds
         verbose : bool
@@ -375,25 +298,17 @@ class MotorCalibrator:
         Returns
         -------
         AngularCalibrationResult
-            Contains expected rotation. Call compute_gain() with
-            measured rotation in degrees to get the gain.
-            
-        Notes
-        -----
-        Use a reference line or tape to measure the rotation angle.
-        Positive rotation is counterclockwise when viewed from above.
-        
-        For differential drive:
-            - Left motor backward, right motor forward = CCW rotation
+            Call compute_factor() with measured rotation in degrees.
         """
+        pwm = abs(pwm)
+        
         if verbose:
             print(f"\n{'='*50}")
             print("ANGULAR CALIBRATION TEST")
             print(f"{'='*50}")
-            print(f"\nWill rotate at angular speed {angular_speed:.2f} for {duration:.1f}s")
-            print("Mark a reference line on the robot (e.g., tape on front)!")
+            print(f"\nWill rotate at PWM=±{pwm} for {duration:.1f}s")
+            print("Mark a reference line on the robot!")
             
-        # Countdown
         if verbose:
             for i in range(self.countdown_seconds, 0, -1):
                 print(f"  Starting in {i}...")
@@ -401,7 +316,7 @@ class MotorCalibrator:
             print("  GO!")
             
         # Execute rotation (left backward, right forward = CCW)
-        self.rover.move(-angular_speed, angular_speed)
+        self.rover.move(-pwm, pwm)
         time.sleep(duration)
         self.rover.stop()
         
@@ -409,51 +324,27 @@ class MotorCalibrator:
             print("  STOP!")
             print(f"\nMeasure how many degrees the robot rotated.")
         
-        result = AngularCalibrationResult(
-            commanded_angular_speed=angular_speed,
-            duration=duration
-        )
-        
-        if verbose:
-            print(f"Expected rotation (at gain=1.0): {result.expected_rotation_deg:.1f}°")
-            
-        return result
+        return AngularCalibrationResult(pwm_value=pwm, duration=duration)
         
     def run_full_calibration(
         self,
-        linear_speed: float = 0.3,
+        linear_pwm: int = 100,
         linear_duration: float = 2.0,
-        angular_speed: float = 0.5,
+        angular_pwm: int = 100,
         angular_duration: float = 2.0,
         verbose: bool = True
     ) -> FullCalibrationResult:
         """
-        Run complete L-shaped calibration.
+        Run complete L-shaped calibration interactively.
         
-        Runs both linear and angular tests interactively, prompting
-        for measurements after each test.
-        
-        Parameters
-        ----------
-        linear_speed : float
-            Speed for linear test
-        linear_duration : float
-            Duration of linear test
-        angular_speed : float
-            Speed for angular test
-        angular_duration : float
-            Duration of angular test
-        verbose : bool
-            Print progress (should be True for interactive use)
-            
         Returns
         -------
         FullCalibrationResult
-            Complete calibration with both gains
+            Complete calibration with factors and ROS2 gains
         """
         if verbose:
             print("\n" + "=" * 60)
-            print("       PyRover MOTOR CALIBRATION")
+            print("       PyRover MOTOR CALIBRATION (PWM Protocol)")
             print("=" * 60)
             print("\nThis will run two tests:")
             print("  1. Drive forward in a straight line")
@@ -463,36 +354,31 @@ class MotorCalibrator:
             
         # Linear test
         linear_result = self.run_linear_test(
-            speed=linear_speed,
+            pwm=linear_pwm,
             duration=linear_duration,
             verbose=verbose
         )
         
-        if verbose:
-            measured_distance = float(input("\nMeasured distance (meters): "))
-            linear_gain = linear_result.compute_gain(measured_distance)
-            print(f"  → Linear gain: {linear_gain:.4f}")
-        else:
-            raise ValueError("Non-verbose mode requires manual gain computation")
+        measured_distance = float(input("\nMeasured distance (meters): "))
+        linear_factor = linear_result.compute_factor(measured_distance)
+        print(f"  → Linear factor: {linear_factor:.6f} m/s per PWM")
             
         # Angular test
-        if verbose:
-            input("\nPress ENTER to continue to angular test...")
+        input("\nPress ENTER to continue to angular test...")
             
         angular_result = self.run_angular_test(
-            angular_speed=angular_speed,
+            pwm=angular_pwm,
             duration=angular_duration,
             verbose=verbose
         )
         
-        if verbose:
-            measured_rotation = float(input("\nMeasured rotation (degrees): "))
-            angular_gain = angular_result.compute_gain(measured_rotation)
-            print(f"  → Angular gain: {angular_gain:.4f}")
+        measured_rotation = float(input("\nMeasured rotation (degrees): "))
+        angular_factor = angular_result.compute_factor(measured_rotation)
+        print(f"  → Angular factor: {angular_factor:.6f} rad/s per PWM")
             
         return FullCalibrationResult(
-            linear_gain=linear_gain,
-            angular_gain=angular_gain,
+            linear_factor=linear_factor,
+            angular_factor=angular_factor,
             linear_result=linear_result,
             angular_result=angular_result
         )
@@ -502,35 +388,35 @@ def run_motor_calibration_cli():
     """
     Command-line interface for motor calibration.
     
-    Entry point for `waveshare-calibrate-motors` command.
+    Entry point for `pyrover-calibrate-motors` command.
     """
     import argparse
     import sys
     
     parser = argparse.ArgumentParser(
-        description="PyRover Motor Calibration Tool",
+        description="PyRover Motor Calibration Tool (PWM Protocol)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example:
-    waveshare-calibrate-motors --port /dev/serial0
+    pyrover-calibrate-motors --port /dev/serial0
     
 The robot will run an L-shaped pattern:
     1. Drive forward - measure distance traveled
     2. Rotate in place - measure rotation angle
     
-Output: linear_gain and angular_gain for your config file.
+Output: Factors and ROS2 gains for your config file.
         """
     )
     parser.add_argument('--port', '-p', default='/dev/serial0',
                         help='Serial port (default: /dev/serial0)')
     parser.add_argument('--baudrate', '-b', type=int, default=115200,
                         help='Baudrate (default: 115200)')
-    parser.add_argument('--linear-speed', type=float, default=0.3,
-                        help='Linear test speed (default: 0.3)')
+    parser.add_argument('--linear-pwm', type=int, default=100,
+                        help='Linear test PWM value (default: 100)')
     parser.add_argument('--linear-duration', type=float, default=2.0,
                         help='Linear test duration in seconds (default: 2.0)')
-    parser.add_argument('--angular-speed', type=float, default=0.5,
-                        help='Angular test speed (default: 0.5)')
+    parser.add_argument('--angular-pwm', type=int, default=100,
+                        help='Angular test PWM value (default: 100)')
     parser.add_argument('--angular-duration', type=float, default=2.0,
                         help='Angular test duration in seconds (default: 2.0)')
     parser.add_argument('--test', action='store_true',
@@ -544,9 +430,9 @@ Output: linear_gain and angular_gain for your config file.
         
         class MockRover:
             def move(self, left, right):
-                print(f"  [MOCK] move({left:.2f}, {right:.2f})")
+                print(f"  [MOCK] M:{left},{right}")
             def stop(self):
-                print("  [MOCK] stop()")
+                print("  [MOCK] STOP")
                 
         rover = MockRover()
     else:
@@ -563,9 +449,9 @@ Output: linear_gain and angular_gain for your config file.
     try:
         calibrator = MotorCalibrator(rover)
         result = calibrator.run_full_calibration(
-            linear_speed=args.linear_speed,
+            linear_pwm=args.linear_pwm,
             linear_duration=args.linear_duration,
-            angular_speed=args.angular_speed,
+            angular_pwm=args.angular_pwm,
             angular_duration=args.angular_duration
         )
         
