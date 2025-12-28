@@ -1,185 +1,64 @@
 """
-Command Types and Enums for Waveshare WAVE ROVER
-================================================
+Command Protocol for Waveshare WAVE ROVER (New Line-Based Driver)
+=================================================================
 
-This module defines the JSON command protocol used to communicate
+This module defines the line-based protocol used to communicate
 with the WAVE ROVER via serial.
 
 Protocol Overview
 -----------------
-The WAVE ROVER uses JSON commands over serial (115200 baud by default).
-Each command is a JSON object with at minimum a "T" field indicating
-the command type.
+The new driver uses simple line-based commands instead of JSON.
+Each line has a prefix followed by colon and comma-separated values.
 
-Example commands:
-    {"T":1,"L":0.3,"R":0.3}     # Move forward at 30% speed
-    {"T":126}                    # Request IMU data
-    {"T":130}                    # Request chassis info
+Output (Device → Host):
+    I:yaw,pitch,roll,temp,ax,ay,az,gx,gy,gz,mx,my,mz  - IMU telemetry
+    P:voltage,current,power,shunt                      - Power data
+    Raw:ax,ay,az,gx,gy,gz,mx,my,mz                    - MotionCal raw
+    Ori:yaw,pitch,roll                                 - MotionCal orientation
+    S:module,message                                   - System messages
+    A:command[,details]                                - Acknowledgments
+    E:source,message                                   - Errors
 
-Reference: https://www.waveshare.com/wiki/WAVE_ROVER
+Input (Host → Device):
+    M:left,right      - Motor speeds (-255 to 255)
+    STOP              - Stop motors
+    ESTOP             - Emergency stop (requires ENABLE to resume)
+    ENABLE            - Re-enable after ESTOP
+    HB                - Heartbeat (reset timeout)
+    STREAM:ON/OFF     - Enable/disable telemetry
+    FMT:RAW/IMU       - Switch output format (MotionCal vs telemetry)
+    CAL:G/A/ALL       - Calibrate gyro/accel/all
+    BETA:value        - Set Madgwick filter beta
+    FAST:duration     - Start fast convergence mode
+    INIT              - Re-initialize filter from sensors
+    WS:ssid,pass,ip[,port] - Connect WiFi and WebSocket
+    WS:OFF            - Disconnect WebSocket
+    STATUS            - Request system status
+    REBOOT            - Restart device
 """
 
-from enum import IntEnum
+
+class OutputPrefix:
+    """Prefixes for messages from device to host."""
+    IMU = "I:"           # IMU telemetry
+    POWER = "P:"         # Power data
+    RAW = "Raw:"         # MotionCal raw sensor data
+    ORI = "Ori:"         # MotionCal orientation
+    SYSTEM = "S:"        # System messages
+    ACK = "A:"           # Command acknowledgments
+    ERROR = "E:"         # Error messages
+    DEBUG = "D:"         # Debug output
 
 
-class CommandType(IntEnum):
-    """
-    JSON command type identifiers (T values).
-    
-    These are the "T" values used in the JSON protocol to identify
-    which command is being sent or what type of response is received.
-    """
-    # =========================================================================
-    # Motion Control (T: 1-20)
-    # =========================================================================
-    SPEED_CTRL = 1
-    """
-    Set wheel speeds directly.
-    
-    Format: {"T":1, "L":<left_speed>, "R":<right_speed>}
-    Speed range: -0.5 to 0.5 (0.5 = 100% PWM)
-    
-    This is the recommended command for WAVE ROVER (no encoders).
-    """
-    
-    SET_MOTOR_PID = 2
-    """
-    Configure motor PID parameters (UGV01 only - has encoders).
-    
-    Format: {"T":2, "P":<kp>, "I":<ki>, "D":<kd>, "L":<limit>}
-    """
-    
-    PWM_INPUT = 11
-    """
-    Direct PWM control.
-    
-    Format: {"T":11, "L":<left_pwm>, "R":<right_pwm>}
-    PWM range: -255 to 255
-    
-    Note: DC gear motors have poor low-speed characteristics.
-    Use SPEED_CTRL (T=1) instead for normal operation.
-    """
-    
-    # =========================================================================
-    # OLED Display (T: 3, -3)
-    # =========================================================================
-    OLED_CTRL = 3
-    """
-    Display text on OLED screen.
-    
-    Format: {"T":3, "lineNum":<0-3>, "Text":"<text>"}
-    """
-    
-    OLED_DEFAULT = -3
-    """
-    Reset OLED to default display (shows robot info).
-    
-    Format: {"T":-3}
-    """
-    
-    # =========================================================================
-    # Module Type (T: 4)
-    # =========================================================================
-    MODULE_TYPE = 4
-    """
-    Set external module type.
-    
-    Format: {"T":4, "cmd":<module_type>}
-    Values: 0=None, 1=RoArm-M2, 3=Gimbal
-    """
-    
-    # =========================================================================
-    # Chassis Feedback (T: 130-143)
-    # =========================================================================
-    BASE_FEEDBACK = 130
-    """
-    Request chassis feedback (voltage, current, speeds).
-    
-    Format: {"T":130}
-    
-    Response includes:
-    - v: voltage
-    - i: current
-    - L, R: wheel speeds
-    """
-    
-    BASE_FEEDBACK_FLOW = 131
-    """
-    Enable/disable continuous serial feedback.
-    
-    Format: {"T":131, "cmd":<0|1>}
-    
-    When enabled, the chassis continuously streams feedback data
-    without requiring polling. Useful for ROS integration.
-    """
-    
-    IO_PWM_CTRL = 132
-    """
-    Set PWM output for IO4 and IO5 pins.
-    
-    Format: {"T":132, "IO4":<0-255>, "IO5":<0-255>}
-    """
-    
-    # =========================================================================
-    # System (T: 600)
-    # =========================================================================
-    REBOOT = 600
-    """
-    Reboot the ESP32.
-    
-    Format: {"T":600}
-    """
-
-    # =========================================================================
-    # Message Format / IMU
-    # =========================================================================
-    IMU_STREAMING = 325
-    """
-    Enable / Disable Streaming
-    
-    Format: {"T":325, "cmd":1}
-    """
-    
-    IMU_TYPE = 400
-    """
-    Sets the IMU stream format.
-    
-    Format: {"T":400, "cmd":1}
-    """
-
-    WIFI = 500
-    """
-    Set Wifi and Websocket configuration.
-    Hardcoded port 8080.
-
-    Format: {"T":500, "ssid":"WiFi-849465", "pass":"11929017", "server":"192.168.10.64"}
-    """
-
-    WS_STATUS = 501
-    """
-    WebSockets Status
-    
-    Format: {"T":501}
-    """
-
-    WS_START = 502
-    """
-    Start streaming to WebSockets
-
-    Format: {"T":502}
-    """
-
-    WS_STOP = 503
-    """
-    Stop streaming to WebSockets
-
-    Format: {"T":503}
-    """
+class StreamFormat:
+    """Stream format options for FMT command."""
+    RAW = "RAW"          # MotionCal format (Raw: and Ori:)
+    IMU = "IMU"          # Telemetry format (I:)
 
 
-class ModuleType(IntEnum):
-    """External module types for T=4 command."""
-    NONE = 0
-    ROARM_M2 = 1
-    GIMBAL = 3
+# Motor limits
+MAX_PWM = 255
+MIN_PWM = -255
 
+# Default timeout (robot stops if no heartbeat/command)
+HEARTBEAT_TIMEOUT_S = 3.0

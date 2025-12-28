@@ -27,6 +27,7 @@ find_package(rosidl_default_generators REQUIRED)
 
 rosidl_generate_interfaces(${PROJECT_NAME}
 "msg/IMUv2.msg"
+"msg/Power.msg"
 "msg/State.msg"
 "msg/Battery.msg"
 "msg/Temperature.msg"

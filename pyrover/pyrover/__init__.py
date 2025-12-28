@@ -1,94 +1,48 @@
 """
-Waveshare PyRover Python Library
-====================================
+PyRover - Waveshare WAVE ROVER Python Library
+=============================================
 
-A pure Python library for controlling Waveshare PyRover robots.
-No ROS2 dependencies - can be used standalone or with ROS2 via the
-rover_ros package.
+A Python library for controlling Waveshare WAVE ROVER robots
+using the new line-based serial protocol.
 
-Main Classes
-------------
-PyRover
-    Main controller class for serial communication with the robot.
-    
-Data Types
-----------
-IMUData
-    Full 9-axis IMU sensor data from the robot.
-RealTimeData
-    Continuous feedback data (when streaming is enabled).
-ChassisInfo
-    Battery voltage, current, and wheel speeds.
-BatteryEstimator
-    Estimate battery state of charge from voltage.
-
-Command Enums
--------------
-CommandType
-    JSON command type identifiers.
-WiFiMode
-    WiFi operating modes.
-ModuleType
-    External module types.
-
-
-Calibration Subpackage
-----------------------
-The `calibration` subpackage provides calibration tools:
-
->>> from pyrover.calibration import MotorCalibrator
-
-Command-line tools are also available after installation:
-
-    pyrover-calibrate-motors --port /dev/serial0
-
-Quick Start
------------
->>> from pyrover import PyRover
->>> 
->>> # Using context manager (recommended)
->>> with PyRover('/dev/serial0') as rover:
-...     rover.move(0.3, 0.3)  # Forward
-...     time.sleep(2)
-...     rover.stop()
->>> 
->>> # Or manual connection
->>> rover = PyRover('/dev/serial0')
->>> rover.connect()
->>> imu = rover.get_imu_data()
->>> print(f"Yaw: {imu.yaw:.1f}°")
->>> rover.disconnect()
+Example:
+    >>> from pyrover import PyRover
+    >>> 
+    >>> with PyRover('/dev/serial0') as rover:
+    ...     rover.move(100, 100)  # Forward
+    ...     rover.stop()
 """
 
-from .rover import PyRover
+from .rover import PyRover, RoverCallbacks
 from .data_types import (
-    IMUData_v2,
-    ChassisInfo,
+    IMUData,
+    PowerData,
+    RawSensorData,
+    Orientation,
+    SystemMessage,
     BatteryEstimator,
+    IMUData_v2,  # Backwards compatibility
 )
 from .commands import (
-    CommandType,
-    ModuleType,
+    OutputPrefix,
+    StreamFormat,
+    MAX_PWM,
+    MIN_PWM,
 )
-from .tools import quaternion_from_euler, wrap_angle
 
-__version__ = "0.1.0"
-__author__ = "Eyas Taifour"
-
+__version__ = "2.0.0"
 __all__ = [
-    # Main class
     "PyRover",
-    
-    # Data types
+    "RoverCallbacks",
+    "IMUData",
     "IMUData_v2",
-    "ChassisInfo",
+    "PowerData",
+    "RawSensorData",
+    "Orientation",
+    "SystemMessage",
     "BatteryEstimator",
-    
-    # Command enums
-    "CommandType",
-    "ModuleType",
-
-    # Tools
-    "quaternion_from_euler",
-    "wrap_angle"
+    "OutputPrefix",
+    "StreamFormat",
+    "MAX_PWM",
+    "MIN_PWM",
 ]

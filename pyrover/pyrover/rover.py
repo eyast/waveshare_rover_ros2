@@ -1,74 +1,78 @@
 """
-WAVE ROVER Serial Communication Library
-=======================================
+WAVE ROVER Serial Communication Library (New Line-Based Protocol)
+==================================================================
 
-A Python library for controlling Waveshare WAVE ROVER robots via JSON commands
-over serial communication.
-
-This is a pure Python library with no ROS2 dependencies. It can be used
-standalone or integrated with ROS2 via the pyrover_driver package.
+A Python library for controlling Waveshare WAVE ROVER robots via
+simple line-based commands over serial communication.
 
 Example:
-    >>> from pyrover import WaveRover
+    >>> from pyrover import PyRover
     >>> 
-    >>> # Using context manager (recommended)
     >>> with PyRover('/dev/serial0') as rover:
-    ...     rover.move(0.3, 0.3)  # Forward
+    ...     rover.move(100, 100)  # Forward at ~40% speed
     ...     time.sleep(2)
     ...     rover.stop()
-    >>> 
-    >>> # Manual connection
-    >>> rover = PyRover('/dev/serial0')
-    >>> rover.connect()
-    >>> rover.move(0.3, 0.3)
-    >>> rover.stop()
-    >>> rover.disconnect()
 
-Reference: https://www.waveshare.com/wiki/WAVE_ROVER
+Protocol:
+    Commands are simple line-based strings:
+        M:left,right    - Motor control (-255 to 255)
+        STOP            - Stop motors
+        HB              - Heartbeat
+        STREAM:ON/OFF   - Enable/disable telemetry
+        FMT:RAW/IMU     - Set output format
+    
+    Responses have prefixes:
+        I:...   - IMU telemetry
+        P:...   - Power data
+        Raw:... - MotionCal raw data
+        Ori:... - MotionCal orientation
+        S:...   - System messages
+        A:...   - Acknowledgments
+        E:...   - Errors
 """
 
 import serial
 import time
 import threading
-import json
-import time
-from typing import Optional, Callable, Dict, Any, Union
+from typing import Optional, Callable, Union
+from dataclasses import dataclass
 
-from .commands import CommandType
-from .data_types import IMUData_v2, ChassisInfo
+from .commands import OutputPrefix, StreamFormat, MAX_PWM, MIN_PWM
+from .data_types import IMUData, PowerData, RawSensorData, Orientation, SystemMessage
+
+
+@dataclass
+class RoverCallbacks:
+    """Callback functions for different message types."""
+    on_imu: Optional[Callable[[IMUData], None]] = None
+    on_power: Optional[Callable[[PowerData], None]] = None
+    on_raw: Optional[Callable[[RawSensorData], None]] = None
+    on_orientation: Optional[Callable[[Orientation], None]] = None
+    on_system: Optional[Callable[[SystemMessage], None]] = None
+    on_ack: Optional[Callable[[str], None]] = None
+    on_error: Optional[Callable[[str], None]] = None
+    on_line: Optional[Callable[[str], None]] = None  # Raw line callback
 
 
 class PyRover:
     """
-    WAVE ROVER robot controller.
-    
-    Provides a high-level interface for controlling Waveshare WAVE ROVER
-    robots via JSON commands over serial communication.
+    WAVE ROVER robot controller using line-based protocol.
     
     Attributes:
-        MAX_SPEED: Maximum speed value (0.5 = 100% PWM)
-        MIN_SPEED: Minimum speed value (-0.5 = 100% PWM reverse)
         MAX_PWM: Maximum PWM value (255)
         MIN_PWM: Minimum PWM value (-255)
-        HEARTBEAT_TIMEOUT: Robot stops if no command received for this long
+        HEARTBEAT_TIMEOUT: Robot stops if no command received (3.0s)
     """
     
-    # Speed limits for WAVE ROVER (no encoders)
-    MAX_SPEED = 0.5
-    MIN_SPEED = -0.5
-    
-    # PWM limits
-    MAX_PWM = 255
-    MIN_PWM = -255
-    
-    # Heartbeat timeout (robot stops if no command received)
-    HEARTBEAT_TIMEOUT = 3.0  # seconds
+    MAX_PWM = MAX_PWM
+    MIN_PWM = MIN_PWM
+    HEARTBEAT_TIMEOUT = 3.0
     
     def __init__(
         self,
         port: str = "/dev/serial0",
         baudrate: int = 115200,
-        callback: Optional[Callable[[Dict[str, Any]], None]] = None,
+        callbacks: Optional[RoverCallbacks] = None,
         auto_connect: bool = False,
         timeout: float = 0.1
     ):
@@ -76,32 +80,31 @@ class PyRover:
         Initialize WAVE ROVER controller.
         
         Args:
-            port: Serial port path (e.g., '/dev/serial0', '/dev/ttyUSB0', 'COM3')
+            port: Serial port path
             baudrate: Serial baudrate (default: 115200)
-            callback: Optional callback function for received data. Called with
-                     parsed JSON dictionary whenever data is received.
+            callbacks: RoverCallbacks instance with handler functions
             auto_connect: Automatically connect on initialization
             timeout: Serial read timeout in seconds
         """
         self.port = port
         self.baudrate = baudrate
-        self.callback = callback
+        self.callbacks = callbacks or RoverCallbacks()
         self.timeout = timeout
         
         self._ser: Optional[serial.Serial] = None
         self._read_thread: Optional[threading.Thread] = None
         self._running = False
-        self._response_buffer: list = []
-        self._response_event = threading.Event()
         self._lock = threading.Lock()
+        
+        # Latest data (updated by read thread)
+        self._latest_imu: Optional[IMUData] = None
+        self._latest_power: Optional[PowerData] = None
+        self._imu_lock = threading.Lock()
+        self._power_lock = threading.Lock()
         
         if auto_connect:
             self.connect()
     
-    @property
-    def now(self):
-        return time.time()
-
     def __enter__(self) -> 'PyRover':
         """Context manager entry."""
         self.connect()
@@ -117,21 +120,15 @@ class PyRover:
     # =========================================================================
     
     def connect(self) -> None:
-        """
-        Open serial connection and start reading thread.
-        
-        Raises:
-            serial.SerialException: If connection fails
-        """
+        """Open serial connection and start reading thread."""
         if self._ser is not None and self._ser.is_open:
             return
-            
+        
         self._ser = serial.Serial(
             self.port,
             baudrate=self.baudrate,
             timeout=self.timeout,
         )
-        # Disable hardware flow control signals that might interfere
         self._ser.rts = False
         self._ser.dtr = False
         
@@ -139,9 +136,8 @@ class PyRover:
         self._read_thread = threading.Thread(target=self._read_serial, daemon=True)
         self._read_thread.start()
         
-        # Small delay to let things settle
         time.sleep(0.1)
-        
+    
     def disconnect(self) -> None:
         """Close serial connection and stop reading thread."""
         self._running = False
@@ -156,15 +152,15 @@ class PyRover:
     
     @property
     def is_connected(self) -> bool:
-        """Check if serial connection is open.
-        Serial connection can be open even if the Raspberry pi
-        is not connected to the Waveshare board. Therefore,
-        this function also sends a query to the board
-        """
+        """Check if serial connection is open."""
         return self._ser is not None and self._ser.is_open
-
+    
+    # =========================================================================
+    # Serial Communication
+    # =========================================================================
+    
     def _read_serial(self) -> None:
-        """Background thread for reading serial data."""
+        """Background thread for reading and parsing serial data."""
         while self._running:
             try:
                 if self._ser and self._ser.in_waiting:
@@ -173,266 +169,227 @@ class PyRover:
                         try:
                             decoded = line.decode('utf-8').strip()
                             if decoded:
-                                # Try to parse as JSON
-                                try:
-                                    data = json.loads(decoded)
-                                    self._response_buffer.append(data)
-                                    self._response_event.set()
-                                    
-                                    if self.callback:
-                                        self.callback(data)
-                                except json.JSONDecodeError:
-                                    # Not JSON, might be debug output
-                                    if self.callback:
-                                        self.callback({'raw': decoded})
+                                self._parse_line(decoded)
                         except UnicodeDecodeError:
                             pass
+                else:
+                    time.sleep(0.001)
             except Exception:
                 if self._running:
                     time.sleep(0.01)
     
-    def send_command(
-        self,
-        command: Dict[str, Any],
-        wait_response: bool = False,
-        timeout: float = 1.0
-    ) -> Optional[Dict[str, Any]]:
+    def _parse_line(self, line: str) -> None:
+        """Parse a received line and dispatch to appropriate callback."""
+        
+        # Always call raw line callback if set
+        if self.callbacks.on_line:
+            self.callbacks.on_line(line)
+        
+        # IMU telemetry
+        if line.startswith(OutputPrefix.IMU):
+            data = IMUData.from_line(line)
+            if data:
+                with self._imu_lock:
+                    self._latest_imu = data
+                if self.callbacks.on_imu:
+                    self.callbacks.on_imu(data)
+        
+        # Power data
+        elif line.startswith(OutputPrefix.POWER):
+            data = PowerData.from_line(line)
+            if data:
+                with self._power_lock:
+                    self._latest_power = data
+                if self.callbacks.on_power:
+                    self.callbacks.on_power(data)
+        
+        # MotionCal raw data
+        elif line.startswith(OutputPrefix.RAW):
+            data = RawSensorData.from_line(line)
+            if data and self.callbacks.on_raw:
+                self.callbacks.on_raw(data)
+        
+        # MotionCal orientation
+        elif line.startswith(OutputPrefix.ORI):
+            data = Orientation.from_line(line)
+            if data and self.callbacks.on_orientation:
+                self.callbacks.on_orientation(data)
+        
+        # System message
+        elif line.startswith(OutputPrefix.SYSTEM):
+            data = SystemMessage.from_line(line)
+            if data and self.callbacks.on_system:
+                self.callbacks.on_system(data)
+        
+        # Acknowledgment
+        elif line.startswith(OutputPrefix.ACK):
+            if self.callbacks.on_ack:
+                self.callbacks.on_ack(line[2:])
+        
+        # Error
+        elif line.startswith(OutputPrefix.ERROR):
+            if self.callbacks.on_error:
+                self.callbacks.on_error(line[2:])
+    
+    def send(self, command: str) -> None:
         """
-        Send a JSON command to the robot.
+        Send a command string to the rover.
         
         Args:
-            command: Dictionary containing the command (must include 'T' key)
-            wait_response: Wait for and return response
-            timeout: Response timeout in seconds
-            
-        Returns:
-            Response dictionary if wait_response=True, else None
-            
-        Raises:
-            ConnectionError: If not connected
+            command: Command string (newline will be appended)
         """
         if not self.is_connected:
             raise ConnectionError("Not connected to WAVE ROVER")
         
         with self._lock:
-            # Clear response buffer
-            if wait_response:
-                self._response_buffer.clear()
-                self._response_event.clear()
-            
-            # Send command
-            cmd_str = json.dumps(command, separators=(',', ':'))
-            self._ser.write(cmd_str.encode() + b'\n') # type:ignore
-            
-            if wait_response:
-                if self._response_event.wait(timeout):
-                    if self._response_buffer:
-                        return self._response_buffer[-1]
-                return None
+            self._ser.write(command.encode() + b'\n')  # type: ignore
     
-    def send_raw(self, data: str) -> None:
-        """
-        Send raw string command.
-        
-        Args:
-            data: Raw string to send (newline will be appended)
-        """
-        if not self.is_connected:
-            raise ConnectionError("Not connected to WAVE ROVER")
-        
-        self._ser.write(data.encode() + b'\n') #type: ignore
-
-
     # =========================================================================
-    # WiFi and Websockets
+    # Data Access
     # =========================================================================
     
-    def connect_to_wifi(self, server_ip) -> Optional[Dict]:
-        """
-        Connects to WiFi and a Websocket server on port 8080.
-        Used to stream IMU raw data to a remote server running Motioncal.
-        """
-
-        response = self.send_command({
-            "T": CommandType.WIFI,
-            "ssid": "WiFi-849465", 
-            "pass":"11929017", 
-            "server": server_ip
-        }, timeout=60)
-        if response:
-            return response
-        else:
-            return None
-
-    def imu_stream_json(self, isJson: bool) -> None:
-        """
-        Stream IMU data in JSON format.
-        """
-        self.send_command({
-            "T": CommandType.IMU_TYPE,
-            "cmd": 1 if isJson else 0
-        }, timeout=1)
-
-    def imu_stream(self, stream: bool) -> None:
-        """
-        Start / Stop streaming IMU data.
-        """
-        self.send_command({
-            "T": CommandType.IMU_STREAMING,
-            "cmd": 1 if stream else 0 
-        }, timeout=1)
-
-    def start_ws_streaming(self) -> Optional[Dict]:
-        """Starts WebSockets streaming."""
-
-        response = self.send_command({
-            "T": CommandType.WS_START})
-        return response if response else None
-
-    def stop_ws_streaming(self) -> Optional[Dict]:
-        """Stops WebSockets streaming."""
-
-        response = self.send_command({
-            "T": CommandType.WS_STOP})
-        return response if response else None
+    @property
+    def imu(self) -> Optional[IMUData]:
+        """Get latest IMU data (thread-safe)."""
+        with self._imu_lock:
+            return self._latest_imu
     
-    def getstatus_ws_streaming(self) -> Optional[Dict]:
-        """Get Status of WebSockets streaming."""
-
-        response = self.send_command({
-            "T": CommandType.WS_STATUS})
-        return response if response else None
-
-    # =========================================================================
-    # IMU
-    # =========================================================================
+    @property
+    def power(self) -> Optional[PowerData]:
+        """Get latest power data (thread-safe)."""
+        with self._power_lock:
+            return self._latest_power
     
-    def set_imu_stream(self, mode) -> None:
-        """
-        Sets the format IMU data is streamed.
-        0 - raw
-        1 - 
-        """
-
-        self.send_command({
-            "T": CommandType.IMU_TYPE,
-            "cmd": 1 if mode else 0
-        })
-
     # =========================================================================
     # Motion Control
     # =========================================================================
     
-    def move(self, left: float, right: float) -> None:
+    def move(self, left: int, right: int) -> None:
         """
-        Set wheel speeds using SPEED_CTRL command.
-        
-        This is the recommended command for controlling WAVE ROVER movement.
-        Speed value of 0.5 = 100% PWM, 0.25 = 50% PWM.
+        Set motor speeds.
         
         Args:
-            left: Left wheel speed (-0.5 to 0.5)
-            right: Right wheel speed (-0.5 to 0.5)
+            left: Left motor speed (-255 to 255)
+            right: Right motor speed (-255 to 255)
         """
-        left = max(self.MIN_SPEED, min(self.MAX_SPEED, left))
-        right = max(self.MIN_SPEED, min(self.MAX_SPEED, right))
+        left = max(self.MIN_PWM, min(self.MAX_PWM, int(left)))
+        right = max(self.MIN_PWM, min(self.MAX_PWM, int(right)))
+        self.send(f"M:{left},{right}")
+    
+    def move_normalized(self, left: float, right: float) -> None:
+        """
+        Set motor speeds using normalized values.
         
-        self.send_command({
-            "T": CommandType.SPEED_CTRL,
-            "L": left,
-            "R": right
-        })
+        Args:
+            left: Left motor speed (-1.0 to 1.0)
+            right: Right motor speed (-1.0 to 1.0)
+        """
+        left = max(-1.0, min(1.0, left))
+        right = max(-1.0, min(1.0, right))
+        self.move(int(left * 255), int(right * 255))
     
     def stop(self) -> None:
-        """Stop all wheel movement."""
-        self.move(0, 0)
+        """Stop all motors."""
+        self.send("STOP")
     
-    def set_motor_pid(
-        self,
-        p: float = 200,
-        i: float = 2500,
-        d: float = 0,
-        windup_limit: int = 255
-    ) -> None:
+    def emergency_stop(self) -> None:
+        """Emergency stop - requires enable() to resume."""
+        self.send("ESTOP")
+    
+    def enable(self) -> None:
+        """Re-enable motors after emergency stop."""
+        self.send("ENABLE")
+    
+    def heartbeat(self) -> None:
+        """Send heartbeat to reset timeout."""
+        self.send("HB")
+    
+    # =========================================================================
+    # Streaming Control
+    # =========================================================================
+    
+    def stream_on(self) -> None:
+        """Enable telemetry streaming."""
+        self.send("STREAM:ON")
+    
+    def stream_off(self) -> None:
+        """Disable telemetry streaming."""
+        self.send("STREAM:OFF")
+    
+    def set_format_imu(self) -> None:
+        """Set output format to IMU telemetry (I: messages)."""
+        self.send("FMT:IMU")
+    
+    def set_format_raw(self) -> None:
+        """Set output format to MotionCal (Raw: and Ori: messages)."""
+        self.send("FMT:RAW")
+    
+    # =========================================================================
+    # IMU / Filter Control
+    # =========================================================================
+    
+    def calibrate_gyro(self) -> None:
+        """Calibrate gyroscope (device must be stationary)."""
+        self.send("CAL:G")
+    
+    def calibrate_accel(self) -> None:
+        """Calibrate accelerometer (device must be stationary and level)."""
+        self.send("CAL:A")
+    
+    def calibrate_all(self) -> None:
+        """Calibrate gyro and accelerometer."""
+        self.send("CAL:ALL")
+    
+    def set_filter_beta(self, beta: float) -> None:
         """
-        Configure motor PID parameters.
-        
-        Note: Only applicable for encoder-equipped models (UGV01).
+        Set Madgwick filter beta parameter.
         
         Args:
-            p: Proportional coefficient
-            i: Integral coefficient
-            d: Derivative coefficient
-            windup_limit: Reserved for anti-windup (not used currently)
+            beta: Filter gain (0.01 to 2.5 typical, higher = faster but noisier)
         """
-        self.send_command({
-            "T": CommandType.SET_MOTOR_PID,
-            "P": p,
-            "I": i,
-            "D": d,
-            "L": windup_limit
-        })
-
-    # =========================================================================
-    # OLED Display
-    # =========================================================================
+        self.send(f"BETA:{beta:.4f}")
     
-    def oled_print(self, line: int, text: str) -> None:
+    def start_fast_convergence(self, duration_ms: int = 2000) -> None:
         """
-        Display text on OLED screen.
+        Start fast convergence mode for quick filter initialization.
         
         Args:
-            line: Line number (0-3)
-            text: Text to display
+            duration_ms: Duration in milliseconds
         """
-        line = max(0, min(3, line))
-        self.send_command({
-            "T": CommandType.OLED_CTRL,
-            "lineNum": line,
-            "Text": str(text)
-        })
+        self.send(f"FAST:{duration_ms}")
     
-    def oled_clear(self) -> None:
-        """Clear OLED and restore default display (robot info)."""
-        self.send_command({"T": CommandType.OLED_DEFAULT})
+    def reinit_filter(self) -> None:
+        """Re-initialize filter from current sensor readings."""
+        self.send("INIT")
     
-    def oled_display(self, lines: list) -> None:
+    # =========================================================================
+    # WiFi / WebSocket
+    # =========================================================================
+    
+    def connect_wifi(self, ssid: str, password: str, server_ip: str, port: int = 8080) -> None:
         """
-        Display multiple lines on OLED.
+        Connect to WiFi and WebSocket server.
         
         Args:
-            lines: List of strings (up to 4 lines)
+            ssid: WiFi network name
+            password: WiFi password
+            server_ip: WebSocket server IP address
+            port: WebSocket server port (default: 8080)
         """
-        for i, text in enumerate(lines[:4]):
-            self.oled_print(i, text)
-
-
-
+        self.send(f"WS:{ssid},{password},{server_ip},{port}")
+    
+    def disconnect_wifi(self) -> None:
+        """Disconnect from WebSocket."""
+        self.send("WS:OFF")
+    
     # =========================================================================
-    # Chassis Information
+    # System
     # =========================================================================
     
-    def get_chassis_info(self, timeout: float = 1.0) -> Optional[ChassisInfo]:
-        """
-        Get chassis feedback information.
-        
-        Returns:
-            ChassisInfo with voltage, current, speeds
-        """
-        response = self.send_command(
-            {"T": CommandType.BASE_FEEDBACK},
-            wait_response=True,
-            timeout=timeout
-        )
-        
-        if response:
-            return ChassisInfo.from_dict(response)
-        return None
-
-    # =========================================================================
-    # System Commands
-    # =========================================================================
+    def request_status(self) -> None:
+        """Request system status."""
+        self.send("STATUS")
     
     def reboot(self) -> None:
         """Reboot the ESP32."""
-        self.send_command({"T": CommandType.REBOOT})
+        self.send("REBOOT")
