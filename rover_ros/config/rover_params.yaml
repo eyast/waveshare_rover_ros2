@@ -1,55 +1,77 @@
-# PyRover ROS2 Driver Configuration
+# =============================================================================
+# PyRover ROS2 Parameters
+# =============================================================================
+# Copy this file to your workspace and customize as needed.
 #
-# This file contains all parameters for the rover_ros package
-# Edit the calibration values after running:
-#   pyrover-calibrate-motors --port /dev/serial0
+# Usage:
+#   ros2 launch rover_ros bringup.launch.py config:=/path/to/my_params.yaml
+# =============================================================================
 
-/**:
+# =============================================================================
+# Rover Controller Node
+# =============================================================================
+rover_controller:
   ros__parameters:
-    # =========================================
-    # Serial Connection
-    # =========================================
+    # Serial connection
     port: "/dev/serial0"
     baudrate: 115200
-    max_speed: 0.5     # Maximum PWM value (0.5 = 100%)
     
-    # =========================================
-    # Motor Calibration
-    # =========================================
-    # These gains convert cmd_vel (m/s, rad/s) to wheel commands.
-    # Run `pyrover-calibrate-motors` to find optimal values.
-    #
-    # Tuning guide:
-    # - Robot moves too slow? Increase linear_gain
-    # - Robot turns too slow? Increase angular_gain
-    # - Robot overshoots turns? Decrease angular_gain
+    # Motor control
+    max_speed: 255           # Maximum PWM value (0-255)
+    linear_gain: 200.0       # Converts m/s to PWM (tune with calibration)
+    angular_gain: 100.0      # Converts rad/s to PWM (tune with calibration)
     
-    linear_gain: 1.0
-    angular_gain: 0.333
-    
-    # =========================================
-    # Publishing Settings
-    # =========================================
-    # Publish rate is applicable to sensor polling IMU, 
-    # Temperature, Chassis, Wheels, and Emerngency
+    # Sensor publishing
     publish_imu: true
-    publish_battery: true 
-    publish_tf: true
+    publish_battery: true
+    
+    # Frame IDs
+    frame_id: "base_link"
+    
+    # Battery configuration
+    battery_cells: 3         # Number of LiPo cells (3S = 3)
+    battery_capacity_mah: 5200
+
+
+# =============================================================================
+# Pose Estimator Node
+# =============================================================================
+pose_estimator:
+  ros__parameters:
+    # Localization mode: 'dead_reckoning', 'imu', or 'fused'
+    localization_mode: "fused"
+    
+    # Fusion weight (0.0 = pure dead reckoning, 1.0 = pure IMU)
+    fusion_alpha: 0.7
+    
+    # Update rate
     publish_rate: 20.0
+    
+    # TF publishing
+    publish_tf: true
     frame_id: "base_link"
     odom_frame_id: "odom"
     
-    # =========================================
-    # Battery Monitoring
-    # =========================================
-    # Default: 3S 18650 cells (common WAVE ROVER configuration)
-    battery_cells: 3
-    battery_capacity_mah: 2600
+    # RViz visualization
+    publish_marker: true
+    arrow_scale: 0.3
 
-    # =========================================
-    # Localization
-    # =========================================
-    # To determine its own pose, the bot needs to perform localization
-    # Choose type: dead_reckoning, imu, bayes, kalman
-    # See `rover_ros\pose_estimator.py` for more information
-    localization_mode: imu
+
+# =============================================================================
+# Notes
+# =============================================================================
+#
+# Motor Calibration:
+#   Run `pyrover-calibrate-motors` to determine linear_gain and angular_gain.
+#   These values convert velocity commands (m/s, rad/s) to PWM values (0-255).
+#
+# Localization Modes:
+#   - dead_reckoning: Integrates cmd_vel only. Drifts over time.
+#   - imu: Uses IMU for heading, cmd_vel for position. Better heading accuracy.
+#   - fused: Blends DR and IMU with configurable weight. Recommended.
+#
+# Battery Configuration:
+#   - 2S LiPo: 7.4V nominal, 8.4V full, 6.0V empty
+#   - 3S LiPo: 11.1V nominal, 12.6V full, 9.0V empty
+#   - 4S LiPo: 14.8V nominal, 16.8V full, 12.0V empty
+#

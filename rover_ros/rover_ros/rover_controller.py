@@ -46,7 +46,7 @@ from geometry_msgs.msg import Twist
 
 from pyrover import PyRover, RoverCallbacks, BatteryEstimator, IMUData, PowerData
 from rover_msgs.msg import IMUv2, Temperature, Battery
-from pyrover.tools import MessageCallback
+from rover_ros.tools import MessageCallback
 
 
 class RoverController(Node):

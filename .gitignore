@@ -3,3 +3,5 @@ log/*
 *.code-workspace*
 rover_esp_driver/*/lib/*
 .pio/*
+__pycache__/*
+*.pyc
