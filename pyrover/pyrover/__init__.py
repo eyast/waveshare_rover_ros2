@@ -30,6 +30,8 @@ from .commands import (
     MIN_PWM,
 )
 
+from pyrover.tools.mathtools import (quaternion_from_euler, wrap_angle)
+
 __version__ = "2.0.0"
 __all__ = [
     "PyRover",
@@ -45,4 +47,6 @@ __all__ = [
     "StreamFormat",
     "MAX_PWM",
     "MIN_PWM",
+    "quaternion_from_euler",
+    "wrap_angle"
 ]

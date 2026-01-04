@@ -55,7 +55,7 @@ def generate_launch_description():
     # Serial port (override config file)
     port_arg = DeclareLaunchArgument(
         'port',
-        default_value='',
+        default_value='/dev/ttyAMA0',
         description='Serial port override (empty = use config file)'
     )
     
