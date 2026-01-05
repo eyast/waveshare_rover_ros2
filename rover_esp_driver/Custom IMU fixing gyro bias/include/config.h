@@ -17,6 +17,7 @@ extern JsonDocument jsonInfoHttp;
 #define I2C_SDA 32
 #define I2C_SCL 33
 #define I2C_FREQ 400000
+//#define I2C_FREQ 100000
 
 #define SERIAL_BAUD 115200
 
@@ -33,6 +34,7 @@ extern JsonDocument jsonInfoHttp;
 
 #define QMI8658C_ADDR 0x6B
 #define AK09918C_ADDR 0x0C
+//#define AK09918C_ADDR 0x7E
 
 // =============================================================================
 // Sensor Configuration
@@ -62,7 +64,7 @@ extern JsonDocument jsonInfoHttp;
 // Filter Configuration
 // =============================================================================
 
-#define MADGWICK_BETA 0.1f
+#define MADGWICK_BETA 0.01f
 
 // Adaptive beta settings (motion-based gain adjustment)
 #define ADAPTIVE_BETA_ENABLED     true

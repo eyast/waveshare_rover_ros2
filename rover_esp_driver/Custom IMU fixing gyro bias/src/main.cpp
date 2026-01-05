@@ -18,7 +18,7 @@
 #include "motioncal_output.h"
 
 void setup() {
-    init_oled();
+    //init_oled();
     Serial.begin(SERIAL_BAUD);
     while (!Serial) {}
     delay(1000);
@@ -40,19 +40,6 @@ void setup() {
         apply_hardcoded_calibration(mag);
     }
 
-    // --- IMU Calibration ---
-    // Device MUST be stationary and level during this phase!
-    // if (imu_ok) {
-    //     imu.calibrate_gyro(1000);
-    //     imu.calibrate_accel(1000);
-    // }
-    // verify_mag_dip();
-
-    // =========================================================================
-    // FILTER INITIALIZATION - KEY IMPROVEMENT!
-    // =========================================================================
-    // Instead of starting at identity [1,0,0,0] and waiting for slow
-    // convergence, we initialize from sensor readings for instant alignment.
     
     if (imu_ok) {
         // Get fresh readings
@@ -83,9 +70,7 @@ void setup() {
         filter.set_beta_range(ADAPTIVE_BETA_STATIONARY, ADAPTIVE_BETA_MOTION);
         filter.set_motion_threshold(MOTION_THRESHOLD_RADS);
         #endif
-        
-        // Optional: Start with fast convergence for extra refinement
-        // filter.start_fast_convergence(FAST_CONVERGENCE_DURATION_MS, FAST_CONVERGENCE_BETA);
+
     }
 
     // --- Power Monitor (INA219) ---
@@ -104,9 +89,9 @@ void setup() {
 
 void loop() {
     serialCtrl();
-    webSocket.loop();
+    // webSocket.loop();
     updateIMUFilter();
     sendIMUStreamData();
-    heartBeatCtrl();
-    inaDataUpdate();
+    //heartBeatCtrl();
+    //inaDataUpdate();
 }

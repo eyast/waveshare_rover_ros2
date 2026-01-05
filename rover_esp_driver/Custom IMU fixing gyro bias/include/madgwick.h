@@ -22,7 +22,7 @@
 
 class MadgwickFilter {
 public:
-    MadgwickFilter(float beta = 0.05f);
+    MadgwickFilter(float beta = 0.95f);
 
     // =========================================================================
     // INITIALIZATION METHODS
