@@ -25,7 +25,7 @@ uint32_t oled_refresh_interval_ms = 60000;  // 1 minute default
 // Adjust these for your battery type
 // Default: 3S LiPo (9.0V empty, 12.6V full)
 static const float BATTERY_MIN_V = 9.0f;
-static const float BATTERY_MAX_V = 12.6f;
+static const float BATTERY_MAX_V = 12.65f;
 
 static uint8_t calc_battery_percent(float voltage) {
     if (voltage <= BATTERY_MIN_V) return 0;
@@ -104,7 +104,7 @@ static void oled_task(void* param) {
     // Show splash (white screen) briefly
     display.fillRect(0, 0, OLED_WIDTH, OLED_HEIGHT, SSD1306_WHITE);
     display.display();
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(250));
     
     // Initial draw
     draw_battery_info(disp_voltage, disp_current, disp_power);

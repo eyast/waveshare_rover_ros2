@@ -26,7 +26,7 @@
 // Axis sign corrections: set to -1 to invert that axis
 #define MAG_AXIS_X_SIGN     1
 #define MAG_AXIS_Y_SIGN     1
-#define MAG_AXIS_Z_SIGN    -1    // Inverted for this hardware!
+#define MAG_AXIS_Z_SIGN     1    // Inverted for this hardware!
 
 // =============================================================================
 // Hard Iron Offsets (in µT)

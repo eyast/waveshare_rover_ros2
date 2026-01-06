@@ -17,16 +17,7 @@
  *   FMT:RAW         - Use MotionCal format (Raw:/Ori:)
  *   FMT:IMU         - Use telemetry format (I:)
  *   
- *   CAL:G           - Calibrate gyroscope
- *   CAL:A           - Calibrate accelerometer
- *   CAL:ALL         - Calibrate all
- *   
- *   BETA:value      - Set filter beta
- *   FAST:duration   - Start fast convergence
  *   INIT            - Re-initialize filter from sensors
- *   
- *   WS:ssid,pass,ip - Connect to WebSocket server
- *   WS:OFF          - Disconnect WebSocket
  *   
  *   STATUS          - Get system status
  *   REBOOT          - Reboot device

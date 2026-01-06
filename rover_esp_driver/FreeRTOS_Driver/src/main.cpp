@@ -27,7 +27,6 @@
 #include "madgwick.h"
 #include "motors.h"
 #include "commands.h"
-#include "websocket.h"
 #include "oled.h"
 
 // =============================================================================
@@ -167,9 +166,6 @@ static void cmd_task(void* param) {
         // Process serial commands
         commands_process();
         
-        // Process WebSocket events
-        websocket_loop();
-        
         // Short delay to prevent busy-waiting
         vTaskDelay(pdMS_TO_TICKS(5));
     }
@@ -247,7 +243,6 @@ void setup() {
     sensors_init();
     motors_init();
     commands_init();
-    websocket_init();
     oled_init();  // Initialize OLED (shows splash screen)
     
     // Initialize filter from sensor readings

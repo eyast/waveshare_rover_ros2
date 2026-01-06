@@ -45,7 +45,6 @@ struct ProtocolState {
     OutputMode output_mode;
     StreamFormat stream_format;
     bool streaming_enabled;
-    bool ws_connected;
 };
 
 extern ProtocolState protocol;
@@ -69,8 +68,6 @@ StreamFormat protocol_get_format();
 void protocol_set_streaming(bool enabled);
 bool protocol_get_streaming();
 
-void protocol_set_ws_connected(bool connected);
-bool protocol_is_ws_connected();
 
 // =============================================================================
 // Message Output Functions
@@ -130,11 +127,5 @@ void out_status(bool imu_ok, bool mag_ok, bool ina_ok,
                 float voltage_V, float current_mA,
                 int motor_left, int motor_right);
 
-// =============================================================================
-// WebSocket State
-// =============================================================================
-
-// Called by websocket module when connection state changes
-void protocol_notify_ws_state(bool connected);
 
 #endif // PROTOCOL_H

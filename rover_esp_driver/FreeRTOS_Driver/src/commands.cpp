@@ -7,7 +7,6 @@
 #include "motors.h"
 #include "sensors.h"
 #include "madgwick.h"
-#include "websocket.h"
 #include "oled.h"
 
 // Command buffer
@@ -140,62 +139,6 @@ bool commands_execute(const char* cmd) {
         return true;
     }
     
-    // Calibration: CAL:G/A/ALL
-    if (starts_with(cmd, "CAL:")) {
-        const char* arg = cmd + 4;
-        if (starts_with(arg, "G")) {
-            imu.calibrate_gyro(500);
-            out_ack("CAL", "gyro");
-        } else if (starts_with(arg, "A")) {
-            imu.calibrate_accel(500);
-            out_ack("CAL", "accel");
-        } else if (starts_with(arg, "ALL")) {
-            imu.calibrate_gyro(500);
-            imu.calibrate_accel(500);
-            filter.reset();
-            // Re-initialize from sensors
-            if (sensors_mag_ok()) {
-                filter.init_from_sensors(
-                    imu.data().accel[0], imu.data().accel[1], imu.data().accel[2],
-                    mag.data().mag[0], mag.data().mag[1], mag.data().mag[2]
-                );
-            } else {
-                filter.init_from_accel(
-                    imu.data().accel[0], imu.data().accel[1], imu.data().accel[2]
-                );
-            }
-            out_ack("CAL", "all");
-        } else {
-            out_error("CAL", "invalid arg");
-            return false;
-        }
-        return true;
-    }
-    
-    // Set beta: BETA:value
-    if (starts_with(cmd, "BETA:")) {
-        float beta;
-        if (parse_float(cmd + 5, &beta) && beta > 0 && beta < 10) {
-            filter.set_beta(beta);
-            out_ack("BETA");
-            return true;
-        }
-        out_error("BETA", "invalid value");
-        return false;
-    }
-    
-    // Fast convergence: FAST:duration
-    if (starts_with(cmd, "FAST:")) {
-        int duration;
-        if (parse_int(cmd + 5, &duration) && duration > 0) {
-            filter.start_fast_convergence(duration);
-            out_ack("FAST");
-            return true;
-        }
-        out_error("FAST", "invalid value");
-        return false;
-    }
-    
     // Initialize filter from sensors
     if (starts_with(cmd, "INIT")) {
         imu.read();
@@ -212,52 +155,6 @@ bool commands_execute(const char* cmd) {
         }
         out_ack("INIT");
         return true;
-    }
-    
-    // WebSocket: WS:ssid,pass,ip or WS:OFF
-    if (starts_with(cmd, "WS:")) {
-        const char* arg = cmd + 3;
-        if (starts_with(arg, "OFF")) {
-            websocket_disconnect();
-            protocol_set_mode(OutputMode::UART);
-            out_ack("WS", "OFF");
-            return true;
-        }
-        
-        // Parse ssid,pass,ip
-        char ssid[32], pass[32], ip[32];
-        int port = WS_PORT_DEFAULT;
-        
-        // Simple parsing: ssid,pass,ip or ssid,pass,ip,port
-        const char* p = arg;
-        char* dst = ssid;
-        int field = 0;
-        
-        while (*p && field < 4) {
-            if (*p == ',') {
-                *dst = '\0';
-                field++;
-                if (field == 1) dst = pass;
-                else if (field == 2) dst = ip;
-                else if (field == 3) {
-                    port = atoi(p + 1);
-                    break;
-                }
-            } else if (*p != '\n' && *p != '\r') {
-                *dst++ = *p;
-            }
-            p++;
-        }
-        *dst = '\0';
-        
-        if (field >= 2) {
-            websocket_connect(ssid, pass, ip, port);
-            out_ack("WS", "connecting");
-            return true;
-        }
-        
-        out_error("WS", "format: ssid,pass,ip[,port]");
-        return false;
     }
     
     // Status

@@ -27,16 +27,18 @@
 #define QMI_CTRL3           0x04
 #define QMI_CTRL5           0x06
 #define QMI_CTRL7           0x08
-#define QMI_CTRL8           0x09
 #define QMI_CTRL9           0x0A
+#define QMI_STATUSINT       0x2D
 #define QMI_STATUS0         0x2E
+#define QMI_STATUS1         0x2F
 #define QMI_TEMP_L          0x33
+#define QMI_RESULTS         0x51
 #define QMI_RESET           0x60
 
 #define QMI_WHO_AM_I_VALUE  0x05
-#define QMI_CTRL9_CMD_NOP   0x00
+#define QMI_CMD_NOP         0x00
 #define QMI_CTRL9_CMD_CALI  0xA2
-#define QMI_CTRL8_DEFAULT   0xC0
+//#define QMI_CTRL8_DEFAULT   0xC0
 #define QMI_STATUS0_AVAIL   0x03
 
 struct IMU_Data {
@@ -64,11 +66,6 @@ public:
                uint8_t gyro_fs = IMU_GYRO_FS,
                uint8_t odr = IMU_ODR);
     bool read();
-    
-    // Calibration (device must be stationary)
-    void calibrate_gyro(uint16_t samples = 500);
-    void calibrate_accel(uint16_t samples = 500);
-    
     const IMU_Data& data() const { return data_; }
     bool is_ok() const { return ok_; }
 

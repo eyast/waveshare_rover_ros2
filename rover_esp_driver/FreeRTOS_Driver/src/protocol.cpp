@@ -3,10 +3,7 @@
  */
 
 #include "protocol.h"
-#include <WebSocketsClient.h>
 
-// External WebSocket client (defined in websocket module)
-extern WebSocketsClient webSocket;
 
 // =============================================================================
 // Protocol State
@@ -14,9 +11,9 @@ extern WebSocketsClient webSocket;
 
 ProtocolState protocol = {
     .output_mode = OutputMode::UART,
-    .stream_format = StreamFormat::TELEMETRY,
-    .streaming_enabled = true,
-    .ws_connected = false
+    .stream_format = StreamFormat::MOTIONCAL,
+    .streaming_enabled = true
+
 };
 
 // Internal buffer for message formatting
@@ -32,10 +29,9 @@ void protocol_init() {
         delay(10);
     }
     
-    protocol.output_mode = OutputMode::UART;
-    protocol.stream_format = StreamFormat::TELEMETRY;
-    protocol.streaming_enabled = true;
-    protocol.ws_connected = false;
+    // protocol.output_mode = OutputMode::UART;
+    // protocol.stream_format = StreamFormat::TELEMETRY;
+    // protocol.streaming_enabled = true;
 }
 
 // =============================================================================
@@ -66,25 +62,13 @@ bool protocol_get_streaming() {
     return protocol.streaming_enabled;
 }
 
-void protocol_set_ws_connected(bool connected) {
-    protocol.ws_connected = connected;
-}
-
-bool protocol_is_ws_connected() {
-    return protocol.ws_connected;
-}
-
 // =============================================================================
 // Low-Level Output
 // =============================================================================
 
 // Send a line to the current output channel
 static void send_line(const char* line) {
-    if (protocol.output_mode == OutputMode::WEBSOCKET && protocol.ws_connected) {
-        webSocket.sendTXT(line);
-    } else {
         Serial.println(line);
-    }
 }
 
 void out_raw(const char* line) {
@@ -249,20 +233,3 @@ void out_status(bool imu_ok, bool mag_ok, bool ina_ok,
     send_line(msg_buffer);
 }
 
-// =============================================================================
-// WebSocket State Notification
-// =============================================================================
-
-void protocol_notify_ws_state(bool connected) {
-    protocol.ws_connected = connected;
-    
-    if (connected) {
-        // When WS connects, switch to WebSocket output
-        protocol.output_mode = OutputMode::WEBSOCKET;
-        out_system("WS_CONNECTED");
-    } else {
-        // When WS disconnects, fall back to Serial
-        protocol.output_mode = OutputMode::UART;
-        out_system("WS_DISCONNECTED");
-    }
-}

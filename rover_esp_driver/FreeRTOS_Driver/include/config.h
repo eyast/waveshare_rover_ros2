@@ -94,12 +94,7 @@
 
 // Telemetry rates (Hz)
 #define TELEM_RATE_IMU      50      // IMU data at 50Hz
-#define TELEM_RATE_POWER    5       // Power data at 5Hz
-
-// WebSocket defaults
-#define WS_PORT_DEFAULT     8080
-#define WS_RECONNECT_MS     3000
-#define WIFI_TIMEOUT_MS     15000
+#define TELEM_RATE_POWER    2       // Power data at 2Hz
 
 // =============================================================================
 // FreeRTOS Task Configuration
@@ -121,7 +116,7 @@
 
 // Task periods (ms)
 #define PERIOD_IMU_MS       10      // 100Hz sensor read
-#define PERIOD_POWER_MS     200     // 5Hz power read
+#define PERIOD_POWER_MS     500     // 2Hz power read
 #define PERIOD_WDT_MS       1000    // 1Hz watchdog check
 
 // =============================================================================

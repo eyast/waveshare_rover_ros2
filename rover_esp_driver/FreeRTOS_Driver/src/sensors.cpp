@@ -31,24 +31,29 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
         ok_ = false;
         return false;
     }
-    
+
+
     // On-demand calibration (hardware gyro bias)
     out_system("QMI8658C", "calibrating");
     i2c_write_register(addr_, QMI_RESET, 0xB0);
     delay(10);
-    i2c_write_register(addr_, QMI_CTRL9, QMI_CTRL9_CMD_CALI);
-    delay(3200);
-    i2c_write_register(addr_, QMI_CTRL9, QMI_CTRL9_CMD_NOP);
-    delay(100);
-    
-    // CTRL1: Address auto-increment, Big-endian
-    i2c_write_register(addr_, QMI_CTRL1, 0x60 | 0x18);
-    
+
     // Disable sensors before config
     i2c_write_register(addr_, QMI_CTRL7, 0x00);
+
+    // Calibrate Gyroscope sensitivity
+    i2c_write_register(addr_, QMI_CTRL9, QMI_CTRL9_CMD_CALI);
+    vTaskDelay(pdMS_TO_TICKS(1000));
+    //delay(3200);
+    i2c_write_register(addr_, QMI_CTRL9, QMI_CMD_NOP);
+    delay(100);
+    i2c_write_register(addr_, QMI_STATUS1, QMI_CMD_NOP);
+    delay(100);
+
     
-    // Motion detection settings
-    i2c_write_register(addr_, QMI_CTRL8, QMI_CTRL8_DEFAULT);
+    // CTRL1: Address auto-increment, Big-endian
+    // i2c_write_register(addr_, QMI_CTRL1, 0x60 | 0x18);
+    i2c_write_register(addr_, QMI_CTRL1, 0x60);
     
     // Accelerometer config
     i2c_write_register(addr_, QMI_CTRL2, (accel_fs << 4) | odr);
@@ -57,7 +62,8 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
     i2c_write_register(addr_, QMI_CTRL3, (gyro_fs << 4) | odr);
     
     // Enable low-pass filters
-    i2c_write_register(addr_, QMI_CTRL5, 0x11);
+    //i2c_write_register(addr_, QMI_CTRL5, 0x11);
+    i2c_write_register(addr_, QMI_CTRL5, 0x77);
     
     // Enable both sensors
     i2c_write_register(addr_, QMI_CTRL7, 0x03);
@@ -107,103 +113,20 @@ bool QMI8658C::read() {
     data_.gyro_raw[1] = (int16_t)((buffer[11] << 8) | buffer[10]);
     data_.gyro_raw[2] = (int16_t)((buffer[13] << 8) | buffer[12]);
     
+    //*
     // Convert to physical units with bias correction
+    // for (int i = 0; i < 3; i++) {
+    //     data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
+    //     data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_) - data_.gyro_bias[i];
+    //     data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
+    // }
     for (int i = 0; i < 3; i++) {
-        data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
-        data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_) - data_.gyro_bias[i];
+        data_.accel[i] = (data_.accel_raw[i] * accel_scale_);
+        data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_);
         data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
     }
     
     return true;
-}
-
-void QMI8658C::calibrate_gyro(uint16_t samples) {
-    out_system("GYRO_CAL", "start");
-    delay(500);
-    
-    // Clear bias temporarily
-    float old_bias[3];
-    for (int i = 0; i < 3; i++) {
-        old_bias[i] = data_.gyro_bias[i];
-        data_.gyro_bias[i] = 0;
-    }
-    
-    double sum[3] = {0, 0, 0};
-    uint16_t valid = 0;
-    
-    for (uint16_t i = 0; i < samples; i++) {
-        uint32_t start = millis();
-        while (!read() && (millis() - start < 50)) {
-            delayMicroseconds(500);
-        }
-        
-        for (int j = 0; j < 3; j++) {
-            sum[j] += data_.gyro_raw[j] * gyro_scale_;
-        }
-        valid++;
-        delay(2);
-    }
-    
-    if (valid < samples / 2) {
-        out_error("GYRO_CAL", "failed");
-        for (int i = 0; i < 3; i++) {
-            data_.gyro_bias[i] = old_bias[i];
-        }
-        return;
-    }
-    
-    for (int i = 0; i < 3; i++) {
-        data_.gyro_bias[i] = sum[i] / valid;
-    }
-    
-    out_system("GYRO_CAL", "done");
-}
-
-void QMI8658C::calibrate_accel(uint16_t samples) {
-    out_system("ACCEL_CAL", "start");
-    delay(500);
-    
-    float old_bias[3];
-    for (int i = 0; i < 3; i++) {
-        old_bias[i] = data_.accel_bias[i];
-        data_.accel_bias[i] = 0;
-    }
-    
-    double sum[3] = {0, 0, 0};
-    uint16_t valid = 0;
-    
-    for (uint16_t i = 0; i < samples; i++) {
-        uint32_t start = millis();
-        while (!read() && (millis() - start < 50)) {
-            delayMicroseconds(500);
-        }
-        
-        for (int j = 0; j < 3; j++) {
-            sum[j] += data_.accel_raw[j] * accel_scale_;
-        }
-        valid++;
-        delay(2);
-    }
-    
-    if (valid < samples / 2) {
-        out_error("ACCEL_CAL", "failed");
-        for (int i = 0; i < 3; i++) {
-            data_.accel_bias[i] = old_bias[i];
-        }
-        return;
-    }
-    
-    float mean[3];
-    for (int i = 0; i < 3; i++) {
-        mean[i] = sum[i] / valid;
-    }
-    
-    // For level device with Z-up: expected ax=0, ay=0, az=+1g
-    data_.accel_bias[0] = mean[0] - 0.0f;
-    data_.accel_bias[1] = mean[1] - 0.0f;
-    data_.accel_bias[2] = mean[2] - 1.0f;
-    
-    out_system("ACCEL_CAL", "done");
 }
 
 // =============================================================================
