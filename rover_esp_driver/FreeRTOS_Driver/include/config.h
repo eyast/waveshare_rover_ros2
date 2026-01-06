@@ -46,7 +46,7 @@
 
 // QMI8658C IMU Settings
 // Accelerometer: 0=±2g, 1=±4g, 2=±8g, 3=±16g
-#define IMU_ACCEL_FS        3
+#define IMU_ACCEL_FS        2
 
 // Gyroscope: 0=±16dps, 1=±32dps, 2=±64dps, 3=±128dps,
 //            4=±256dps, 5=±512dps, 6=±1024dps, 7=±2048dps
@@ -54,7 +54,7 @@
 
 // ODR: 0=8000Hz, 1=4000Hz, 2=2000Hz, 3=1000Hz,
 //      4=500Hz, 5=250Hz, 6=117.5Hz, 7=58.75Hz
-#define IMU_ODR             3
+#define IMU_ODR             0
 
 // AK09918C Magnetometer
 #define MAG_SCALE           0.15f   // µT per LSB
@@ -81,7 +81,7 @@
 #define SERIAL_BAUD         115200
 
 // Telemetry rates (Hz)
-#define TELEM_RATE_IMU      50      // IMU data at 50Hz
+#define TELEM_RATE_IMU      100      // IMU data at 50Hz
 #define TELEM_RATE_POWER    5       // Power data at 5Hz
 
 // =============================================================================

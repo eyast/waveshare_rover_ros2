@@ -8,7 +8,7 @@
  *   - Dual H-bridge motor control
  * 
  * Tasks:
- *   - IMU Task: Reads sensors, Fuse sensors
+ *   - IMU Task: Reads sensors, Fuse using Madgwick
  *   - Telemetry Task: Sends telemetry at configured rate
  *   - Command Task: Parses and executes serial commands
  *   - Power Task: Reads power monitor
@@ -50,7 +50,7 @@ static TaskHandle_t wdt_task_handle = NULL;
 // Shared State
 // =============================================================================
 
-static uint32_t last_imu_update_us = 0;
+// static uint32_t last_imu_update_us = 0;
 static float cpu_temp = 0;
 
 // Mutex for sensor data access
@@ -70,17 +70,7 @@ static void imu_task(void* param) {
         // Read sensors
         if (xSemaphoreTake(sensor_mutex, pdMS_TO_TICKS(10)) == pdTRUE) {
             sensors_read_imu();
-            
-            // Calculate dt
-            // uint32_t now_us = micros();
-            // float dt = (now_us - last_imu_update_us) / 1000000.0f;
-            // last_imu_update_us = now_us;
-            
-            // // Sanity check dt
-            // if (dt <= 0 || dt > 0.1f) {
-            //     dt = 0.01f;  // Default to 100Hz
-            // }
-            
+                        
             // Update filter
             const IMU_Data& imu_data = imu.data();
             const MAG_Data& mag_data = mag.data();
@@ -92,21 +82,6 @@ static void imu_task(void* param) {
                     mag_data.mag[0], mag_data.mag[1], mag_data.mag[2],
                     deltat
             );
-            
-            // if (sensors_mag_ok()) {
-            //     filter.update(
-            //         imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
-            //         imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
-            //         mag_data.mag[0], mag_data.mag[1], mag_data.mag[2],
-            //         dt
-            //     );
-            // } else {
-            //     filter.update_imu(
-            //         imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
-            //         imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
-            //         dt
-            //     );
-            // }
             
             xSemaphoreGive(sensor_mutex);
         }
@@ -247,23 +222,20 @@ static void wdt_task(void* param) {
 // =============================================================================
 
 void setup() {
-    // Initialize protocol first (includes Serial)
+    // Initialize protocol first (Serial)
     protocol_init();
-    delay(500);
-    
     out_system("BOOT", "starting");
     
     // Create mutex for sensor data
     sensor_mutex = xSemaphoreCreateMutex();
     
-    // Initialize subsystems
+    // Find initial guess for Quaternion to 
+    // reduce drift
     sensors_init();
+    sensors_read_imu();
     motors_init();
     commands_init();
-    oled_init();  // Initialize OLED (shows splash screen)
-    
-    // Initialize timing
-    last_imu_update_us = micros();
+    oled_init();  // Initialize OLED 
     
     // Configure watchdog
     esp_task_wdt_init(WDT_TIMEOUT_SEC, true);  // true = panic on timeout

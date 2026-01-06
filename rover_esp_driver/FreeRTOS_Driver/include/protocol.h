@@ -117,15 +117,4 @@ void out_imu_telemetry(float yaw, float pitch, float roll, float temp,
 // "P:voltage_mV,current_mA,power_mW,shunt_mV"
 void out_power(float voltage_V, float current_mA, float power_mW, float shunt_mV);
 
-// =============================================================================
-// Status Output
-// =============================================================================
-
-// Send complete system status
-void out_status(bool imu_ok, bool mag_ok, bool ina_ok,
-                float yaw, float pitch, float roll,
-                float voltage_V, float current_mA,
-                int motor_left, int motor_right);
-
-
 #endif // PROTOCOL_H

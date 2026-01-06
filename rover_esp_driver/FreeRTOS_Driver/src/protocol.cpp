@@ -4,7 +4,6 @@
 
 #include "protocol.h"
 
-
 // =============================================================================
 // Protocol State
 // =============================================================================
@@ -28,10 +27,6 @@ void protocol_init() {
     while (!Serial && millis() < 3000) {
         delay(10);
     }
-    
-    // protocol.output_mode = OutputMode::UART;
-    // protocol.stream_format = StreamFormat::TELEMETRY;
-    // protocol.streaming_enabled = true;
 }
 
 // =============================================================================
@@ -213,23 +208,4 @@ void out_power(float voltage_V, float current_mA, float power_mW, float shunt_mV
     send_line(msg_buffer);
 }
 
-// =============================================================================
-// Status Output
-// =============================================================================
-
-void out_status(bool imu_ok, bool mag_ok, bool ina_ok,
-                float yaw, float pitch, float roll,
-                float voltage_V, float current_mA,
-                int motor_left, int motor_right) {
-    snprintf(msg_buffer, sizeof(msg_buffer),
-             "%s:STATUS,imu=%d,mag=%d,ina=%d,y=%.1f,p=%.1f,r=%.1f,v=%.2f,i=%.1f,ml=%d,mr=%d",
-             MSG_SYSTEM,
-             imu_ok ? 1 : 0,
-             mag_ok ? 1 : 0,
-             ina_ok ? 1 : 0,
-             yaw, pitch, roll,
-             voltage_V, current_mA,
-             motor_left, motor_right);
-    send_line(msg_buffer);
-}
 
