@@ -85,6 +85,7 @@ private:
 #define AK_WIA1             0x00
 #define AK_WIA2             0x01
 #define AK_ST1              0x10
+#define AK_ST2              0x18
 #define AK_HXL              0x11
 #define AK_CNTL2            0x31
 #define AK_CNTL3            0x32
@@ -113,6 +114,7 @@ public:
     bool begin(uint8_t mode = AK_MODE_CONT_100HZ);
     bool read();
     bool data_ready();
+    void is_overflow(uint8_t hofl_register);
     
     // Calibration
     void set_hard_iron(float bx, float by, float bz);
@@ -126,6 +128,7 @@ private:
     float scale_;
     MAG_Data data_;
     bool ok_;
+    bool overflow_;
 };
 
 // =============================================================================

@@ -140,6 +140,7 @@ AK09918C::AK09918C(uint8_t addr) : addr_(addr), scale_(MAG_SCALE), ok_(false) {
     data_.soft_iron[0][0] = 1.0f;
     data_.soft_iron[1][1] = 1.0f;
     data_.soft_iron[2][2] = 1.0f;
+    overflow_ = false;
     
 }
 
@@ -166,6 +167,13 @@ bool AK09918C::begin(uint8_t mode) {
     return true;
 }
 
+void AK09918C::is_overflow(uint8_t hofl_register ){
+    bool holf_status = (hofl_register >> 3 ) & 1;
+    if (holf_status == 1){
+        this->overflow_ = true;
+    }
+}
+
 bool AK09918C::data_ready() {
     uint8_t st1 = i2c_read_register(addr_, AK_ST1);
     return (st1 & AK_ST1_DRDY) != 0;
@@ -181,6 +189,8 @@ bool AK09918C::read() {
         return false;
     }
     
+    is_overflow(buffer[8]);
+
     // Parse raw values (little-endian)
     data_.mag_raw[0] = (int16_t)((buffer[1] << 8) | buffer[0]);
     data_.mag_raw[1] = (int16_t)((buffer[3] << 8) | buffer[2]);
