@@ -47,7 +47,7 @@
 #define MAG_FIELD_STRENGTH  55.91f  // µT
 
 // Enable/disable hardcoded calibration
-#define USE_HARDCODED_CAL   true
+#define USE_HARDCODED_CAL   false
 
 // =============================================================================
 // Apply Calibration Function
@@ -70,6 +70,70 @@ inline void apply_hardcoded_calibration(AK09918C& mag) {
     };
     mag.set_soft_iron(soft_iron);
     
+#endif
+}
+
+// =============================================================================
+// Accelerometer calibration - Extracted from python script
+// Inspired by Magneto (code in AccelGyroCalib folder)
+//
+// Starting calibration...
+// ----------------------------------------------------------------------
+// Calibrating with 178 samples...
+// Data range: X[-0.96, 1.03], Y[-1.06, 0.96], Z[-1.00, 0.99]
+// Largest eigenvalue: 0.019405
+// Bias (offset): [0.0345, -0.0000, -0.0061]
+// Measured field magnitude: 0.7595
+// Reference field strength: 1.0000
+// Scaling factor: 1.3167
+
+// Calibration Matrix:
+// [[ 1.00384913e+00 -2.01243186e-03 -1.39028724e-04]
+//  [-2.01243186e-03  9.94378533e-01 -6.27564895e-04]
+//  [-1.39028724e-04 -6.27564895e-04  1.00312631e+00]]
+
+// ============================================================
+// CALIBRATION QUALITY METRICS
+// ============================================================
+// Raw data magnitude:        0.9988 ± 0.0189
+// Calibrated data magnitude: 1.0000 ± 0.0091
+// Improvement in std dev:    52.0%
+// ============================================================
+
+#define ACC_CALIB_BIAS_X     0.0345f
+#define ACC_CALIB_BIAS_Y     0.0000f
+#define ACC_CALIB_BIAS_Z    -0.0061f
+#define ACC_CALIB_00         1.00384913e+00f
+#define ACC_CALIB_01        -2.01243186e-03f 
+#define ACC_CALIB_02        -1.39028724e-04f
+#define ACC_CALIB_10        -2.01243186e-03f
+#define ACC_CALIB_11         9.94378533e-01f
+#define ACC_CALIB_12        -6.27564895e-04f
+#define ACC_CALIB_20        -1.39028724e-04f
+#define ACC_CALIB_21        -6.27564895e-04f
+#define ACC_CALIB_22         1.00312631e+00f
+
+// Enable/disable hardcoded calibration of accelerometer
+#define USE_ACCELEROMETER_CAL   true
+
+// =============================================================================
+// Apply Calibration Function
+// =============================================================================
+
+inline void apply_accelerometer_calibration(QMI8658C& imu) {
+#if USE_ACCELEROMETER_CAL
+    float acc_calib_matrix[3][3] = {
+        { ACC_CALIB_00, ACC_CALIB_01, ACC_CALIB_02 },
+        { ACC_CALIB_10, ACC_CALIB_11, ACC_CALIB_12 },
+        { ACC_CALIB_20, ACC_CALIB_21, ACC_CALIB_22 }
+    };
+
+    imu.set_accel_calib(
+        ACC_CALIB_BIAS_X,
+        ACC_CALIB_BIAS_Y,
+        ACC_CALIB_BIAS_Z,
+        acc_calib_matrix
+    );
 #endif
 }
 

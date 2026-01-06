@@ -21,6 +21,11 @@ INA219 pwr(ADDR_INA219);
 
 QMI8658C::QMI8658C(uint8_t addr) : addr_(addr), accel_scale_(0), gyro_scale_(0), ok_(false) {
     memset(&data_, 0, sizeof(data_));
+    
+    // Initialize Acceleration Matrix to identity
+    data_.accel_calib_matrix[0][0] = 1.0f;
+    data_.accel_calib_matrix[1][1] = 1.0f;
+    data_.accel_calib_matrix[2][2] = 1.0f;
 }
 
 bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
@@ -88,6 +93,20 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
     return true;
 }
 
+void QMI8658C::set_accel_calib(float bx,
+                               float by,
+                               float bz,
+                               float acc_calib_matrix[3][3]){
+    data_.accel_bias[0] = bx;
+    data_.accel_bias[1] = by;
+    data_.accel_bias[2] = bz;
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            data_.accel_calib_matrix[i][j] = acc_calib_matrix[i][j];
+        }
+    }
+}
+
 bool QMI8658C::read() {
     uint8_t status = i2c_read_register(addr_, QMI_STATUS0);
     if (!(status & QMI_STATUS0_AVAIL)) {
@@ -113,6 +132,7 @@ bool QMI8658C::read() {
     data_.gyro_raw[1] = (int16_t)((buffer[11] << 8) | buffer[10]);
     data_.gyro_raw[2] = (int16_t)((buffer[13] << 8) | buffer[12]);
     
+    
     //*
     // Convert to physical units with bias correction
     // for (int i = 0; i < 3; i++) {
@@ -121,11 +141,23 @@ bool QMI8658C::read() {
     //     data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
     // }
     for (int i = 0; i < 3; i++) {
-        data_.accel[i] = (data_.accel_raw[i] * accel_scale_);
+        data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
         data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_);
         data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
     }
     
+    data_.accel[0] = data_.accel_calib_matrix[0][0] * data_.accel[0] +
+          data_.accel_calib_matrix[0][1] * data_.accel[1] +
+          data_.accel_calib_matrix[0][2] * data_.accel[2];
+  
+    data_.accel[1]  = data_.accel_calib_matrix[1][0] * data_.accel[0] +
+          data_.accel_calib_matrix[1][1] * data_.accel[1] +
+          data_.accel_calib_matrix[1][2] * data_.accel[2];
+  
+    data_.accel[2]  = data_.accel_calib_matrix[2][0] * data_.accel[0] +
+          data_.accel_calib_matrix[2][1] * data_.accel[1] +
+          data_.accel_calib_matrix[2][2] * data_.accel[2];
+
     return true;
 }
 

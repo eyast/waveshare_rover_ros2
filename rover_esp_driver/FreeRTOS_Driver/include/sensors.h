@@ -54,8 +54,9 @@ struct IMU_Data {
     float temperature;      // Celsius
     
     // Calibration offsets
-    float accel_bias[3];    // g
-    float gyro_bias[3];     // deg/s
+    float accel_bias[3];
+    float accel_calib_matrix[3][3];    
+    float gyro_bias[3];     
 };
 
 class QMI8658C {
@@ -68,6 +69,10 @@ public:
     bool read();
     const IMU_Data& data() const { return data_; }
     bool is_ok() const { return ok_; }
+    void set_accel_calib(float bx,
+                         float by,
+                         float bz,
+                         float acc_calib_matrix[3][3]);
 
 private:
     uint8_t addr_;

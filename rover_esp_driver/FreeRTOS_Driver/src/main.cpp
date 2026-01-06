@@ -27,6 +27,7 @@
 #include "commands.h"
 #include "oled.h"
 #include "SensorFusion.h"
+#include "hardcoded_calibration.h"
 
 
 // =============================================================================
@@ -225,6 +226,8 @@ void setup() {
     // Initialize protocol first (Serial)
     protocol_init();
     out_system("BOOT", "starting");
+    out_system("USE_HARDCODED_CAL", USE_HARDCODED_CAL);
+    out_system("USE_ACCELEROMETER_CAL", USE_ACCELEROMETER_CAL);
     
     // Create mutex for sensor data
     sensor_mutex = xSemaphoreCreateMutex();
