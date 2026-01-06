@@ -20,8 +20,8 @@ def filter_data(data: str):
         return
     if data[:3] == 'Raw': 
             try:
-                values = data.split(":")[1].split(",")[0:3]
-                values = [float(x)/8192 for x in values]
+                values = data.split(":")[1].split(",")[4:7]
+                values = [float(x)/16 for x in values]
                 samples.append(tuple(values))
                 cntr += 1
                 if cntr % 10 == 0:

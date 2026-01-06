@@ -160,6 +160,17 @@ void out_motioncal_raw(float ax, float ay, float az,
     int mag_x = (int)(mx * MOTIONCAL_MAG_SCALE);
     int mag_y = (int)(my * MOTIONCAL_MAG_SCALE);
     int mag_z = (int)(mz * MOTIONCAL_MAG_SCALE);
+    // float accel_x = (ax * MOTIONCAL_ACCEL_SCALE);
+    // float accel_y = (ay * MOTIONCAL_ACCEL_SCALE);
+    // float accel_z = (az * MOTIONCAL_ACCEL_SCALE);
+    
+    // float gyro_x = (gx * MOTIONCAL_GYRO_SCALE);
+    // float gyro_y = (gy * MOTIONCAL_GYRO_SCALE);
+    // float gyro_z = (gz * MOTIONCAL_GYRO_SCALE);
+    
+    // float mag_x = (mx * MOTIONCAL_MAG_SCALE);
+    // float mag_y = (my * MOTIONCAL_MAG_SCALE);
+    // float mag_z = (mz * MOTIONCAL_MAG_SCALE);
     
     // Exact format expected by MotionCal
     snprintf(msg_buffer, sizeof(msg_buffer),

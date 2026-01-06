@@ -73,6 +73,9 @@ public:
                          float by,
                          float bz,
                          float acc_calib_matrix[3][3]);
+    void set_gyro_calib(float bx,
+                        float by,
+                        float bz);
 
 private:
     uint8_t addr_;
@@ -110,6 +113,9 @@ struct MAG_Data {
     // Calibration
     float hard_iron[3];     // Hard iron offsets
     float soft_iron[3][3];  // Soft iron correction matrix
+
+    // float magnitude;        // Actual field magnitude after calibration
+    // float magnitude_error; 
 };
 
 class AK09918C {

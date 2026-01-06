@@ -46,7 +46,7 @@
 
 // QMI8658C IMU Settings
 // Accelerometer: 0=±2g, 1=±4g, 2=±8g, 3=±16g
-#define IMU_ACCEL_FS        2
+#define IMU_ACCEL_FS        3
 
 // Gyroscope: 0=±16dps, 1=±32dps, 2=±64dps, 3=±128dps,
 //            4=±256dps, 5=±512dps, 6=±1024dps, 7=±2048dps
@@ -138,5 +138,8 @@ constexpr uint16_t MOTOR_PWM_MAX = (1 << MOTOR_PWM_BITS) - 1;  // 255
 // Telemetry intervals in ms
 constexpr uint32_t TELEM_INTERVAL_IMU_MS = 1000 / TELEM_RATE_IMU;
 constexpr uint32_t TELEM_INTERVAL_POWER_MS = 1000 / TELEM_RATE_POWER;
+
+// Magnetometer field strength validation
+// #define MAG_MAGNITUDE_WARNING_THRESHOLD  5.0f  // Warn if >5µT deviation
 
 #endif // CONFIG_H

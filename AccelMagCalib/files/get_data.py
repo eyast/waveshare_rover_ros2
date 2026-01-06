@@ -10,6 +10,8 @@ import termios
 
 output_fn = 'accelerator_samples.txt'
 
+accel = False # if true, collects acceleration data, else collects gyroscope
+
 PORT = '/dev/cu.usbserial-110'  
 BAUDRATE = 115200
 
@@ -23,8 +25,12 @@ def filter_data(data: str):
     
     if data[:3] == 'Raw' and collect_next:
         try:
-            values = data.split(":")[1].split(",")[0:3]
-            values = [float(x)/8192 for x in values]
+            if accel:
+                values = data.split(":")[1].split(",")[0:3]
+                values = [float(x)/8192 for x in values]
+            else:
+                values = data.split(":")[1].split(",")[4:7]
+                values = [float(x)/16 for x in values]
             samples.append(tuple(values))
             cntr += 1
             collect_next = False

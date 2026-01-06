@@ -58,6 +58,7 @@ bool QMI8658C::begin(uint8_t accel_fs, uint8_t gyro_fs, uint8_t odr) {
     
     // CTRL1: Address auto-increment, Big-endian
     // i2c_write_register(addr_, QMI_CTRL1, 0x60 | 0x18);
+    //i2c_write_register(addr_, QMI_CTRL1, 0x60 | 0x10);
     i2c_write_register(addr_, QMI_CTRL1, 0x60);
     
     // Accelerometer config
@@ -107,6 +108,14 @@ void QMI8658C::set_accel_calib(float bx,
     }
 }
 
+void QMI8658C::set_gyro_calib(float bx,
+                              float by,
+                              float bz){
+    data_.gyro_bias[0] = bx;
+    data_.gyro_bias[1] = by;
+    data_.gyro_bias[2] = bz;
+}
+
 bool QMI8658C::read() {
     uint8_t status = i2c_read_register(addr_, QMI_STATUS0);
     if (!(status & QMI_STATUS0_AVAIL)) {
@@ -132,31 +141,35 @@ bool QMI8658C::read() {
     data_.gyro_raw[1] = (int16_t)((buffer[11] << 8) | buffer[10]);
     data_.gyro_raw[2] = (int16_t)((buffer[13] << 8) | buffer[12]);
     
-    
-    //*
-    // Convert to physical units with bias correction
-    // for (int i = 0; i < 3; i++) {
-    //     data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
-    //     data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_) - data_.gyro_bias[i];
-    //     data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
-    // }
+    float accel_unbiased[3], gyro_unbiased[3];
     for (int i = 0; i < 3; i++) {
-        data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
-        data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_);
+        data_.accel[i]= (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
+        gyro_unbiased[i] = data_.gyro_raw[i] - data_.gyro_bias[i];  // Bias in LSB!
+        data_.gyro_dps[i] = gyro_unbiased[i] * gyro_scale_;
         data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
     }
+    // for (int i = 0; i < 3; i++) {
+    //     data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
+    //     //data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_) - data_.gyro_bias[i];
+    //     data_.gyro_dps[i] = ((data_.gyro_raw[i] - data_.gyro_bias[i]  ) * gyro_scale_);
+    //     data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
+    // }
     
-    data_.accel[0] = data_.accel_calib_matrix[0][0] * data_.accel[0] +
-          data_.accel_calib_matrix[0][1] * data_.accel[1] +
-          data_.accel_calib_matrix[0][2] * data_.accel[2];
-  
-    data_.accel[1]  = data_.accel_calib_matrix[1][0] * data_.accel[0] +
-          data_.accel_calib_matrix[1][1] * data_.accel[1] +
-          data_.accel_calib_matrix[1][2] * data_.accel[2];
-  
-    data_.accel[2]  = data_.accel_calib_matrix[2][0] * data_.accel[0] +
-          data_.accel_calib_matrix[2][1] * data_.accel[1] +
-          data_.accel_calib_matrix[2][2] * data_.accel[2];
+    float ax_cal = data_.accel_calib_matrix[0][0] * data_.accel[0] +
+                data_.accel_calib_matrix[0][1] * data_.accel[1] +
+                data_.accel_calib_matrix[0][2] * data_.accel[2];
+
+    float ay_cal = data_.accel_calib_matrix[1][0] * data_.accel[0] +
+                data_.accel_calib_matrix[1][1] * data_.accel[1] +
+                data_.accel_calib_matrix[1][2] * data_.accel[2];
+
+    float az_cal = data_.accel_calib_matrix[2][0] * data_.accel[0] +
+                data_.accel_calib_matrix[2][1] * data_.accel[1] +
+                data_.accel_calib_matrix[2][2] * data_.accel[2];
+
+    data_.accel[0] = ax_cal;
+    data_.accel[1] = ay_cal;
+    data_.accel[2] = az_cal;
 
     return true;
 }
@@ -221,7 +234,7 @@ bool AK09918C::read() {
         return false;
     }
     
-    is_overflow(buffer[8]);
+    is_overflow(buffer[7]);
 
     // Parse raw values (little-endian)
     data_.mag_raw[0] = (int16_t)((buffer[1] << 8) | buffer[0]);
@@ -238,6 +251,24 @@ bool AK09918C::read() {
     float my_si = data_.soft_iron[1][0] * mx + data_.soft_iron[1][1] * my + data_.soft_iron[1][2] * mz;
     float mz_si = data_.soft_iron[2][0] * mx + data_.soft_iron[2][1] * my + data_.soft_iron[2][2] * mz;
     
+    data_.mag[0] = mx_si;
+    data_.mag[1] = my_si;
+    data_.mag[2] = mz_si;
+
+    // data_.magnitude = sqrtf(mx_si*mx_si + my_si*my_si + mz_si*mz_si);
+    // data_.magnitude_error = data_.magnitude - MAG_FIELD_STRENGTH;
+
+    // // Warn if magnitude is significantly off
+    // if (fabsf(data_.magnitude_error) > MAG_MAGNITUDE_WARNING_THRESHOLD) {
+    //     static uint32_t last_warning = 0;
+    //     uint32_t now = millis();
+    //     // Rate-limit warnings to once per 5 seconds
+    //     if (now - last_warning > 5000) {
+    //         out_error("MAG", "field magnitude deviation");
+    //         last_warning = now;
+    //     }
+    // }
+
     return true;
 }
 

@@ -19,35 +19,39 @@
 
 #include "sensors.h"
 
+// Enable/disable hardcoded calibration
+#define USE_HARDCODED_CAL       true
+#define USE_ACCELEROMETER_CAL   true
+#define USE_GYROSCOPE_CALIB     true
+
 // =============================================================================
 // Hard Iron Offsets (in µT)
 // =============================================================================
 // These compensate for permanent magnetic fields from nearby components
 
-#define MAG_HARD_IRON_X     34.00f
-#define MAG_HARD_IRON_Y    -35.76f
-#define MAG_HARD_IRON_Z    -31.99f
+#define MAG_HARD_IRON_X      23.06f // 34.00f
+#define MAG_HARD_IRON_Y     -35.88f //-35.76f
+#define MAG_HARD_IRON_Z     -5.39f //-31.99f
 
 // =============================================================================
 // Soft Iron Correction Matrix
 // =============================================================================
 // Compensates for distortions in the magnetic field
 
-#define MAG_SOFT_IRON_00    1.025f
-#define MAG_SOFT_IRON_01    0.023f
-#define MAG_SOFT_IRON_02   -0.057f
-#define MAG_SOFT_IRON_10    0.023f
-#define MAG_SOFT_IRON_11    1.066f
-#define MAG_SOFT_IRON_12   -0.004f
-#define MAG_SOFT_IRON_20   -0.057f
-#define MAG_SOFT_IRON_21   -0.004f
-#define MAG_SOFT_IRON_22    0.919f
+#define MAG_SOFT_IRON_00    1.009f //1.025f
+#define MAG_SOFT_IRON_01    0.007f //0.023f
+#define MAG_SOFT_IRON_02    0.011f //-0.057f
+#define MAG_SOFT_IRON_10    0.007f //0.023f
+#define MAG_SOFT_IRON_11    1.020f //1.066f
+#define MAG_SOFT_IRON_12   -0.003f //-0.004f
+#define MAG_SOFT_IRON_20    0.011f //-0.057f
+#define MAG_SOFT_IRON_21   -0.033f //-0.004f
+#define MAG_SOFT_IRON_22    0.973f //0.919f
 
 // Expected field strength after calibration
-#define MAG_FIELD_STRENGTH  55.91f  // µT
+#define MAG_FIELD_STRENGTH  57.51f // 55.91f  // µT
 
-// Enable/disable hardcoded calibration
-#define USE_HARDCODED_CAL   false
+
 
 // =============================================================================
 // Apply Calibration Function
@@ -113,8 +117,6 @@ inline void apply_hardcoded_calibration(AK09918C& mag) {
 #define ACC_CALIB_21        -6.27564895e-04f
 #define ACC_CALIB_22         1.00312631e+00f
 
-// Enable/disable hardcoded calibration of accelerometer
-#define USE_ACCELEROMETER_CAL   true
 
 // =============================================================================
 // Apply Calibration Function
@@ -133,6 +135,27 @@ inline void apply_accelerometer_calibration(QMI8658C& imu) {
         ACC_CALIB_BIAS_Y,
         ACC_CALIB_BIAS_Z,
         acc_calib_matrix
+    );
+#endif
+}
+
+// =============================================================================
+//  Gyroscope Calibration
+// =============================================================================
+
+// Enable/disable hardcoded calibration of accelerometer
+
+
+#define GYRO_CALIB_BIAS_X     2.222135347351610f 
+#define GYRO_CALIB_BIAS_Y    -0.527376674651761f 
+#define GYRO_CALIB_BIAS_Z    29.260097817407505f
+
+inline void apply_gyroscope_calibration(QMI8658C& imu) {
+#if USE_GYROSCOPE_CALIB
+    imu.set_gyro_calib(
+        GYRO_CALIB_BIAS_X,
+        GYRO_CALIB_BIAS_Y,
+        GYRO_CALIB_BIAS_Z
     );
 #endif
 }

@@ -21,3 +21,8 @@ TODO:
 [ ] Check INA configuration
 [ ] Inspect the board (microscope) to check that Z axis of both AK and QMI are the same. Reflect this on the hardcoded_calibration.h
 
+reordered bias terms
+added big endian
+fixed accelerator code
+fixed soft iron
+fixed call to is_overflow (out of index)
