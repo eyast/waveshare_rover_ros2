@@ -27,13 +27,6 @@ Input (Host → Device):
     HB                - Heartbeat (reset timeout)
     STREAM:ON/OFF     - Enable/disable telemetry
     FMT:RAW/IMU       - Switch output format (MotionCal vs telemetry)
-    CAL:G/A/ALL       - Calibrate gyro/accel/all
-    BETA:value        - Set Madgwick filter beta
-    FAST:duration     - Start fast convergence mode
-    INIT              - Re-initialize filter from sensors
-    WS:ssid,pass,ip[,port] - Connect WiFi and WebSocket
-    WS:OFF            - Disconnect WebSocket
-    STATUS            - Request system status
     REBOOT            - Restart device
 """
 

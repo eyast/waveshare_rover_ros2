@@ -65,8 +65,8 @@ def main():
         rover.stop()
         
         # Read latest data
-        imu = rover.imu
-        power = rover.power
+        imu = rover._latest_imu
+        power = rover._latest_power
         
         if imu:
             print(f"Final orientation: {imu.yaw:.1f}°")

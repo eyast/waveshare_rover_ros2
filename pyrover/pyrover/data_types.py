@@ -10,8 +10,11 @@ The new driver uses line-based output:
     P:voltage,current,power,shunt
 """
 
-from dataclasses import dataclass, field
-from typing import Optional, List
+import logging
+from dataclasses import dataclass
+from typing import Optional
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -60,8 +63,8 @@ class IMUData:
             
             parts = line.strip().split(',')
             if len(parts) != 13:
+                logger.warning(f"Invalid IMU data: {line}")
                 return None
-            
             values = [float(p) for p in parts]
             return cls(
                 yaw=values[0],
@@ -78,7 +81,9 @@ class IMUData:
                 my=values[11],
                 mz=values[12],
             )
-        except (ValueError, IndexError):
+        except Exception as e:
+            logger.warning(f"Could not parse IMU data." \
+                           "Data: {e}-{line}")
             return None
     
     def is_valid(self) -> bool:
@@ -116,13 +121,11 @@ class PowerData:
             PowerData instance or None if parsing fails
         """
         try:
-            if line.startswith("P:"):
-                line = line[2:]
-            
+            line = line[2:]
             parts = line.strip().split(',')
             if len(parts) != 4:
+                logger.warning(f"Invalid Power data: {line}")
                 return None
-            
             values = [float(p) for p in parts]
             return cls(
                 voltage=values[0],
@@ -130,7 +133,9 @@ class PowerData:
                 power=values[2],
                 shunt=values[3],
             )
-        except (ValueError, IndexError):
+        except Exception as e:
+            logger.warning(f"Could not parse Power data." \
+                           "Data: {e}-{line}")
             return None
 
 
@@ -160,16 +165,16 @@ class RawSensorData:
     def from_line(cls, line: str) -> Optional['RawSensorData']:
         """Parse from Raw: line."""
         try:
-            if line.startswith("Raw:"):
-                line = line[4:]
-            
+            line = line[4:]
             parts = line.strip().split(',')
             if len(parts) != 9:
+                logger.warning(f"Invalid Raw data: {line}")
                 return None
-            
             values = [int(p) for p in parts]
             return cls(*values)
-        except (ValueError, IndexError):
+        except Exception as e:
+            logger.warning(f"Could not parse Raw data." \
+                           "Data: {e}-{line}")
             return None
     
     def to_physical_units(self) -> tuple:
@@ -202,20 +207,19 @@ class Orientation:
     def from_line(cls, line: str) -> Optional['Orientation']:
         """Parse from Ori: line."""
         try:
-            # Handle "Ori: " with space
-            if line.startswith("Ori:"):
-                line = line[4:].strip()
-            
+            line = line[4:].strip()
             parts = line.split(',')
             if len(parts) != 3:
+                logger.warning(f"Invalid Orientation data: {line}")
                 return None
-            
             return cls(
                 yaw=float(parts[0]),
                 pitch=float(parts[1]),
                 roll=float(parts[2]),
             )
-        except (ValueError, IndexError):
+        except Exception as e:
+            logger.warning(f"Could not parse Orientation data." \
+                           "Data: {e}-{line}")
             return None
 
 
@@ -233,19 +237,17 @@ class SystemMessage:
     def from_line(cls, line: str) -> Optional['SystemMessage']:
         """Parse from S: line."""
         try:
-            if line.startswith("S:"):
-                line = line[2:]
-            
+            line = line[2:] 
             parts = line.strip().split(',', 1)
             if len(parts) >= 1:
                 return cls(
                     module=parts[0],
                     message=parts[1] if len(parts) > 1 else ""
                 )
+        except Exception as e:
+            logger.warning(f"Could not parse line to system message." \
+                           "Data: {e}-{line}")
             return None
-        except (ValueError, IndexError):
-            return None
-
 
 class BatteryEstimator:
     """
@@ -334,6 +336,3 @@ class BatteryEstimator:
         else:
             return 'CRITICAL'
 
-
-# Backwards compatibility alias
-IMUData_v2 = IMUData

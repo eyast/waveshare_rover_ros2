@@ -30,15 +30,19 @@ Protocol:
         A:...   - Acknowledgments
         E:...   - Errors
 """
-
+import logging
 import serial
 import time
 import threading
-from typing import Optional, Callable, Union
+from typing import Optional, Callable
 from dataclasses import dataclass
 
-from .commands import OutputPrefix, StreamFormat, MAX_PWM, MIN_PWM
-from .data_types import IMUData, PowerData, RawSensorData, Orientation, SystemMessage
+from .commands import OutputPrefix, MAX_PWM, MIN_PWM
+from .data_types import (IMUData,
+                         PowerData,
+                         RawSensorData,
+                         Orientation,
+                         SystemMessage)
 
 
 @dataclass
@@ -101,6 +105,7 @@ class PyRover:
         self._latest_power: Optional[PowerData] = None
         self._imu_lock = threading.Lock()
         self._power_lock = threading.Lock()
+        self._logger = logging.getLogger(f"PyRover")
         
         if auto_connect:
             self.connect()
@@ -276,18 +281,6 @@ class PyRover:
         right = max(self.MIN_PWM, min(self.MAX_PWM, int(right)))
         self.send(f"M:{left},{right}")
     
-    def move_normalized(self, left: float, right: float) -> None:
-        """
-        Set motor speeds using normalized values.
-        
-        Args:
-            left: Left motor speed (-1.0 to 1.0)
-            right: Right motor speed (-1.0 to 1.0)
-        """
-        left = max(-1.0, min(1.0, left))
-        right = max(-1.0, min(1.0, right))
-        self.move(int(left * 255), int(right * 255))
-    
     def stop(self) -> None:
         """Stop all motors."""
         self.send("STOP")
@@ -324,72 +317,11 @@ class PyRover:
         """Set output format to MotionCal (Raw: and Ori: messages)."""
         self.send("FMT:RAW")
     
-    # =========================================================================
-    # IMU / Filter Control
-    # =========================================================================
-    
-    def calibrate_gyro(self) -> None:
-        """Calibrate gyroscope (device must be stationary)."""
-        self.send("CAL:G")
-    
-    def calibrate_accel(self) -> None:
-        """Calibrate accelerometer (device must be stationary and level)."""
-        self.send("CAL:A")
-    
-    def calibrate_all(self) -> None:
-        """Calibrate gyro and accelerometer."""
-        self.send("CAL:ALL")
-    
-    def set_filter_beta(self, beta: float) -> None:
-        """
-        Set Madgwick filter beta parameter.
-        
-        Args:
-            beta: Filter gain (0.01 to 2.5 typical, higher = faster but noisier)
-        """
-        self.send(f"BETA:{beta:.4f}")
-    
-    def start_fast_convergence(self, duration_ms: int = 2000) -> None:
-        """
-        Start fast convergence mode for quick filter initialization.
-        
-        Args:
-            duration_ms: Duration in milliseconds
-        """
-        self.send(f"FAST:{duration_ms}")
-    
-    def reinit_filter(self) -> None:
-        """Re-initialize filter from current sensor readings."""
-        self.send("INIT")
-    
-    # =========================================================================
-    # WiFi / WebSocket
-    # =========================================================================
-    
-    def connect_wifi(self, ssid: str, password: str, server_ip: str, port: int = 8080) -> None:
-        """
-        Connect to WiFi and WebSocket server.
-        
-        Args:
-            ssid: WiFi network name
-            password: WiFi password
-            server_ip: WebSocket server IP address
-            port: WebSocket server port (default: 8080)
-        """
-        self.send(f"WS:{ssid},{password},{server_ip},{port}")
-    
-    def disconnect_wifi(self) -> None:
-        """Disconnect from WebSocket."""
-        self.send("WS:OFF")
-    
+   
     # =========================================================================
     # System
     # =========================================================================
-    
-    def request_status(self) -> None:
-        """Request system status."""
-        self.send("STATUS")
-    
+   
     def reboot(self) -> None:
         """Reboot the ESP32."""
         self.send("REBOOT")
