@@ -20,15 +20,6 @@
 #include "sensors.h"
 
 // =============================================================================
-// Magnetometer Axis Alignment
-// =============================================================================
-
-// Axis sign corrections: set to -1 to invert that axis
-#define MAG_AXIS_X_SIGN     1
-#define MAG_AXIS_Y_SIGN     1
-#define MAG_AXIS_Z_SIGN     1    // Inverted for this hardware!
-
-// =============================================================================
 // Hard Iron Offsets (in µT)
 // =============================================================================
 // These compensate for permanent magnetic fields from nearby components
@@ -79,8 +70,6 @@ inline void apply_hardcoded_calibration(AK09918C& mag) {
     };
     mag.set_soft_iron(soft_iron);
     
-    // Axis sign corrections
-    mag.set_axis_signs(MAG_AXIS_X_SIGN, MAG_AXIS_Y_SIGN, MAG_AXIS_Z_SIGN);
 #endif
 }
 

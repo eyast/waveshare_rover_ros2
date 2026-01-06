@@ -117,7 +117,6 @@ public:
     // Calibration
     void set_hard_iron(float bx, float by, float bz);
     void set_soft_iron(const float matrix[3][3]);
-    void set_axis_signs(int8_t x, int8_t y, int8_t z);
     
     const MAG_Data& data() const { return data_; }
     bool is_ok() const { return ok_; }
@@ -126,7 +125,6 @@ private:
     uint8_t addr_;
     float scale_;
     MAG_Data data_;
-    int8_t axis_sign_[3];
     bool ok_;
 };
 

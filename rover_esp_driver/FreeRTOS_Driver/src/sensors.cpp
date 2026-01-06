@@ -141,10 +141,6 @@ AK09918C::AK09918C(uint8_t addr) : addr_(addr), scale_(MAG_SCALE), ok_(false) {
     data_.soft_iron[1][1] = 1.0f;
     data_.soft_iron[2][2] = 1.0f;
     
-    // Default axis signs (no correction)
-    axis_sign_[0] = 1;
-    axis_sign_[1] = 1;
-    axis_sign_[2] = 1;
 }
 
 bool AK09918C::begin(uint8_t mode) {
@@ -200,11 +196,6 @@ bool AK09918C::read() {
     float my_si = data_.soft_iron[1][0] * mx + data_.soft_iron[1][1] * my + data_.soft_iron[1][2] * mz;
     float mz_si = data_.soft_iron[2][0] * mx + data_.soft_iron[2][1] * my + data_.soft_iron[2][2] * mz;
     
-    // Apply axis sign corrections
-    data_.mag[0] = mx_si * axis_sign_[0];
-    data_.mag[1] = my_si * axis_sign_[1];
-    data_.mag[2] = mz_si * axis_sign_[2];
-    
     return true;
 }
 
@@ -220,12 +211,6 @@ void AK09918C::set_soft_iron(const float matrix[3][3]) {
             data_.soft_iron[i][j] = matrix[i][j];
         }
     }
-}
-
-void AK09918C::set_axis_signs(int8_t x, int8_t y, int8_t z) {
-    axis_sign_[0] = (x >= 0) ? 1 : -1;
-    axis_sign_[1] = (y >= 0) ? 1 : -1;
-    axis_sign_[2] = (z >= 0) ? 1 : -1;
 }
 
 // =============================================================================
