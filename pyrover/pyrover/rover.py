@@ -41,8 +41,9 @@ from .commands import OutputPrefix, MAX_PWM, MIN_PWM
 from .data_types import (IMUData,
                          PowerData,
                          RawSensorData,
-                         Orientation,
-                         SystemMessage)
+                         Orientation)
+
+from . import log_exceptions
 
 
 @dataclass
@@ -52,7 +53,7 @@ class RoverCallbacks:
     on_power: Optional[Callable[[PowerData], None]] = None
     on_raw: Optional[Callable[[RawSensorData], None]] = None
     on_orientation: Optional[Callable[[Orientation], None]] = None
-    on_system: Optional[Callable[[SystemMessage], None]] = None
+    on_system: Optional[Callable[[str], None]] = None
     on_ack: Optional[Callable[[str], None]] = None
     on_error: Optional[Callable[[str], None]] = None
     on_line: Optional[Callable[[str], None]] = None  # Raw line callback
@@ -103,8 +104,10 @@ class PyRover:
         # Latest data (updated by read thread)
         self._latest_imu: Optional[IMUData] = None
         self._latest_power: Optional[PowerData] = None
+        self._latest_ori: Optional[Orientation] = None
         self._imu_lock = threading.Lock()
         self._power_lock = threading.Lock()
+        self._ori_lock = threading.Lock()
         self._logger = logging.getLogger(f"PyRover")
         
         if auto_connect:
@@ -124,6 +127,7 @@ class PyRover:
     # Connection Management
     # =========================================================================
     
+    @log_exceptions
     def connect(self) -> None:
         """Open serial connection and start reading thread."""
         if self._ser is not None and self._ser.is_open:
@@ -143,6 +147,7 @@ class PyRover:
         
         time.sleep(0.1)
     
+    @log_exceptions
     def disconnect(self) -> None:
         """Close serial connection and stop reading thread."""
         self._running = False
@@ -164,6 +169,7 @@ class PyRover:
     # Serial Communication
     # =========================================================================
     
+    @log_exceptions
     def _read_serial(self) -> None:
         """Background thread for reading and parsing serial data."""
         while self._running:
@@ -183,12 +189,9 @@ class PyRover:
                 if self._running:
                     time.sleep(0.01)
     
+    @log_exceptions
     def _parse_line(self, line: str) -> None:
         """Parse a received line and dispatch to appropriate callback."""
-        
-        # Always call raw line callback if set
-        if self.callbacks.on_line:
-            self.callbacks.on_line(line)
         
         # IMU telemetry
         if line.startswith(OutputPrefix.IMU):
@@ -217,24 +220,30 @@ class PyRover:
         # MotionCal orientation
         elif line.startswith(OutputPrefix.ORI):
             data = Orientation.from_line(line)
-            if data and self.callbacks.on_orientation:
-                self.callbacks.on_orientation(data)
+            if data:
+                with self._ori_lock:
+                    self._latest_ori = data
+                if self.callbacks.on_orientation:
+                    self.callbacks.on_orientation(data)
         
         # System message
         elif line.startswith(OutputPrefix.SYSTEM):
-            data = SystemMessage.from_line(line)
-            if data and self.callbacks.on_system:
-                self.callbacks.on_system(data)
+            if self.callbacks.on_system:
+                self.callbacks.on_system(line)
         
         # Acknowledgment
         elif line.startswith(OutputPrefix.ACK):
             if self.callbacks.on_ack:
-                self.callbacks.on_ack(line[2:])
+                self.callbacks.on_ack(line)
         
         # Error
         elif line.startswith(OutputPrefix.ERROR):
             if self.callbacks.on_error:
-                self.callbacks.on_error(line[2:])
+                self.callbacks.on_error(line)
+
+        
+        elif self.callbacks.on_line:
+            self.callbacks.on_line(line)
     
     def send(self, command: str) -> None:
         """
@@ -269,6 +278,7 @@ class PyRover:
     # Motion Control
     # =========================================================================
     
+    @log_exceptions
     def move(self, left: int, right: int) -> None:
         """
         Set motor speeds.
@@ -281,18 +291,22 @@ class PyRover:
         right = max(self.MIN_PWM, min(self.MAX_PWM, int(right)))
         self.send(f"M:{left},{right}")
     
+    @log_exceptions
     def stop(self) -> None:
         """Stop all motors."""
         self.send("STOP")
     
+    @log_exceptions
     def emergency_stop(self) -> None:
         """Emergency stop - requires enable() to resume."""
         self.send("ESTOP")
     
+    @log_exceptions
     def enable(self) -> None:
         """Re-enable motors after emergency stop."""
         self.send("ENABLE")
     
+    @log_exceptions
     def heartbeat(self) -> None:
         """Send heartbeat to reset timeout."""
         self.send("HB")
@@ -301,27 +315,31 @@ class PyRover:
     # Streaming Control
     # =========================================================================
     
+    @log_exceptions
     def stream_on(self) -> None:
         """Enable telemetry streaming."""
         self.send("STREAM:ON")
     
+    @log_exceptions
     def stream_off(self) -> None:
         """Disable telemetry streaming."""
         self.send("STREAM:OFF")
     
+    @log_exceptions
     def set_format_imu(self) -> None:
         """Set output format to IMU telemetry (I: messages)."""
         self.send("FMT:IMU")
     
+    @log_exceptions
     def set_format_raw(self) -> None:
         """Set output format to MotionCal (Raw: and Ori: messages)."""
         self.send("FMT:RAW")
     
-   
     # =========================================================================
     # System
     # =========================================================================
    
+    @log_exceptions
     def reboot(self) -> None:
         """Reboot the ESP32."""
         self.send("REBOOT")

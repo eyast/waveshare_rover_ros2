@@ -96,7 +96,6 @@ class RoverController(Node):
         self.imu_pub = self.create_publisher(IMUv2, '/sensor/IMU', 10)
         self.temp_pub = self.create_publisher(Temperature, '/sensor/Temperature', 10)
         self.battery_pub = self.create_publisher(Battery, '/sensor/Battery', 10)
-        
         # ===== Subscribers =====
         self.cmd_vel_sub = self.create_subscription(
             Twist, 'cmd_vel', self._cmd_vel_callback, 10
@@ -122,9 +121,7 @@ class RoverController(Node):
                 on_imu=self._msg_handler.on_imu if self.publish_imu else None,
                 on_power=self._msg_handler.on_power if self.publish_battery else None,
                 on_system=self._msg_handler.on_system,
-                on_error=self._msg_handler.on_error,
             )
-            
             self.rover = PyRover(
                 port=self.port,
                 baudrate=self.baudrate,

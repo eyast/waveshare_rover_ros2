@@ -12,6 +12,7 @@ from typing import Tuple
 
 from pyrover import IMUData, PowerData
 from rover_msgs.msg import IMUv2, Temperature, Battery
+from rcl_interfaces.msg import Log
 
 
 def imu_to_ros_msg(ros_node, data: IMUData) -> IMUv2:
@@ -181,7 +182,7 @@ class MessageCallback:
     
     def on_system(self, msg) -> None:
         """Handle system messages."""
-        self.parent.get_logger().info(f"[{msg.module}] {msg.message}")
+        self.parent.get_logger().info(f"[{msg}")
     
     def on_error(self, msg: str) -> None:
         """Handle error messages."""

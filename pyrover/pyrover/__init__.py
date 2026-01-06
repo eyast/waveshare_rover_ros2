@@ -20,8 +20,7 @@ from .data_types import (
     RawSensorData,
     Orientation,
     SystemMessage,
-    BatteryEstimator,
-    IMUData_v2,  # Backwards compatibility
+    BatteryEstimator, # Backwards compatibility
 )
 from .commands import (
     OutputPrefix,
@@ -32,12 +31,13 @@ from .commands import (
 
 from pyrover.tools.mathtools import (quaternion_from_euler, wrap_angle)
 
+from pyrover.tools.utilities import log_exceptions
+
 __version__ = "2.0.0"
 __all__ = [
     "PyRover",
     "RoverCallbacks",
     "IMUData",
-    "IMUData_v2",
     "PowerData",
     "RawSensorData",
     "Orientation",
@@ -48,5 +48,6 @@ __all__ = [
     "MAX_PWM",
     "MIN_PWM",
     "quaternion_from_euler",
-    "wrap_angle"
+    "wrap_angle",
+    "log_exceptions"
 ]
