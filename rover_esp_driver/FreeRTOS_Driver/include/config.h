@@ -60,18 +60,6 @@
 #define MAG_SCALE           0.15f   // µT per LSB
 
 // =============================================================================
-// Madgwick Filter Configuration
-// =============================================================================
-
-#define FILTER_BETA_DEFAULT         0.1f
-#define FILTER_BETA_STATIONARY      0.5f
-#define FILTER_BETA_MOTION          0.05f
-#define FILTER_MOTION_THRESHOLD     0.05f   // rad/s (~3 deg/s)
-#define FILTER_FAST_CONV_DURATION   2000    // ms
-#define FILTER_FAST_CONV_BETA       2.5f
-#define FILTER_ADAPTIVE_ENABLED     true
-
-// =============================================================================
 // Motor Configuration
 // =============================================================================
 
@@ -94,7 +82,7 @@
 
 // Telemetry rates (Hz)
 #define TELEM_RATE_IMU      50      // IMU data at 50Hz
-#define TELEM_RATE_POWER    2       // Power data at 2Hz
+#define TELEM_RATE_POWER    5       // Power data at 5Hz
 
 // =============================================================================
 // FreeRTOS Task Configuration
@@ -116,7 +104,7 @@
 
 // Task periods (ms)
 #define PERIOD_IMU_MS       10      // 100Hz sensor read
-#define PERIOD_POWER_MS     500     // 2Hz power read
+#define PERIOD_POWER_MS     200     // 5Hz power read
 #define PERIOD_WDT_MS       1000    // 1Hz watchdog check
 
 // =============================================================================

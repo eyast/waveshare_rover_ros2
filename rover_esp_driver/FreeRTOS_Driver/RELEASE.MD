@@ -16,8 +16,8 @@ sensors.cpp
 
 
 TODO:
-- Add Gyroscope and Accelerometer Self-Test
-- Check the time for Gyro sensitivity calibration (sensors.cpp line 45) is enough (set at 3200 ms)
-- Check INA configuration
-- Inspect the board (microscope) to check that Z axis of both AK and QMI are the same. Reflect this on the hardcoded_calibration.h
+[x] Add Gyroscope and Accelerometer Self-Test
+[ ] Check the time for Gyro sensitivity calibration (sensors.cpp line 45) is enough (set at 3200 ms)
+[ ] Check INA configuration
+[ ] Inspect the board (microscope) to check that Z axis of both AK and QMI are the same. Reflect this on the hardcoded_calibration.h
 

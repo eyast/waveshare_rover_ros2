@@ -8,7 +8,7 @@
  *   - Dual H-bridge motor control
  * 
  * Tasks:
- *   - IMU Task: Reads sensors, updates Madgwick filter
+ *   - IMU Task: Reads sensors, Fuse sensors
  *   - Telemetry Task: Sends telemetry at configured rate
  *   - Command Task: Parses and executes serial commands
  *   - Power Task: Reads power monitor
@@ -20,14 +20,21 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "esp_task_wdt.h"
-
 #include "config.h"
 #include "protocol.h"
 #include "sensors.h"
-#include "madgwick.h"
 #include "motors.h"
 #include "commands.h"
 #include "oled.h"
+#include "SensorFusion.h"
+
+
+// =============================================================================
+// Sensor Fusion
+// =============================================================================
+
+SF fusion;
+float deltat;
 
 // =============================================================================
 // Task Handles
@@ -65,33 +72,41 @@ static void imu_task(void* param) {
             sensors_read_imu();
             
             // Calculate dt
-            uint32_t now_us = micros();
-            float dt = (now_us - last_imu_update_us) / 1000000.0f;
-            last_imu_update_us = now_us;
+            // uint32_t now_us = micros();
+            // float dt = (now_us - last_imu_update_us) / 1000000.0f;
+            // last_imu_update_us = now_us;
             
-            // Sanity check dt
-            if (dt <= 0 || dt > 0.1f) {
-                dt = 0.01f;  // Default to 100Hz
-            }
+            // // Sanity check dt
+            // if (dt <= 0 || dt > 0.1f) {
+            //     dt = 0.01f;  // Default to 100Hz
+            // }
             
             // Update filter
             const IMU_Data& imu_data = imu.data();
             const MAG_Data& mag_data = mag.data();
-            
-            if (sensors_mag_ok()) {
-                filter.update(
+
+            deltat = fusion.deltatUpdate(); 
+            fusion.MadgwickUpdate(
                     imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
                     imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
                     mag_data.mag[0], mag_data.mag[1], mag_data.mag[2],
-                    dt
-                );
-            } else {
-                filter.update_imu(
-                    imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
-                    imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
-                    dt
-                );
-            }
+                    deltat
+            );
+            
+            // if (sensors_mag_ok()) {
+            //     filter.update(
+            //         imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
+            //         imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+            //         mag_data.mag[0], mag_data.mag[1], mag_data.mag[2],
+            //         dt
+            //     );
+            // } else {
+            //     filter.update_imu(
+            //         imu_data.gyro[0], imu_data.gyro[1], imu_data.gyro[2],
+            //         imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
+            //         dt
+            //     );
+            // }
             
             xSemaphoreGive(sensor_mutex);
         }
@@ -134,11 +149,13 @@ static void telem_task(void* param) {
                         mag_raw_ut[0], mag_raw_ut[1], mag_raw_ut[2]
                     );
                     
-                    out_motioncal_ori(filter.yaw(), filter.pitch(), filter.roll());
+                    out_motioncal_ori(fusion.getYaw(),
+                                      fusion.getPitch(),
+                                      fusion.getRoll());
                 } else {
                     // Send telemetry format
                     out_imu_telemetry(
-                        filter.yaw(), filter.pitch(), filter.roll(), cpu_temp,
+                        fusion.getYaw(), fusion.getPitch(), fusion.getRoll(), cpu_temp,
                         imu_data.accel[0], imu_data.accel[1], imu_data.accel[2],
                         imu_data.gyro_dps[0], imu_data.gyro_dps[1], imu_data.gyro_dps[2],
                         mag_data.mag[0], mag_data.mag[1], mag_data.mag[2]
@@ -244,30 +261,6 @@ void setup() {
     motors_init();
     commands_init();
     oled_init();  // Initialize OLED (shows splash screen)
-    
-    // Initialize filter from sensor readings
-    if (sensors_imu_ok()) {
-        imu.read();
-        
-        if (sensors_mag_ok()) {
-            mag.read();
-            filter.init_from_sensors(
-                imu.data().accel[0], imu.data().accel[1], imu.data().accel[2],
-                mag.data().mag[0], mag.data().mag[1], mag.data().mag[2]
-            );
-            out_system("FILTER", "init_9dof");
-        } else {
-            filter.init_from_accel(
-                imu.data().accel[0], imu.data().accel[1], imu.data().accel[2]
-            );
-            out_system("FILTER", "init_6dof");
-        }
-        
-        // Configure adaptive beta
-        filter.set_adaptive(true);
-        filter.set_beta_range(FILTER_BETA_STATIONARY, FILTER_BETA_MOTION);
-        filter.set_motion_threshold(FILTER_MOTION_THRESHOLD);
-    }
     
     // Initialize timing
     last_imu_update_us = micros();

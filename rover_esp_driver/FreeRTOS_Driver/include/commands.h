@@ -17,9 +17,6 @@
  *   FMT:RAW         - Use MotionCal format (Raw:/Ori:)
  *   FMT:IMU         - Use telemetry format (I:)
  *   
- *   INIT            - Re-initialize filter from sensors
- *   
- *   STATUS          - Get system status
  *   REBOOT          - Reboot device
  *   HB              - Heartbeat (reset motor timeout)
  */

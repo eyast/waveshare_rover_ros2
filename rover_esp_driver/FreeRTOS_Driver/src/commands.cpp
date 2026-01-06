@@ -6,7 +6,6 @@
 #include "protocol.h"
 #include "motors.h"
 #include "sensors.h"
-#include "madgwick.h"
 #include "oled.h"
 
 // Command buffer
@@ -136,41 +135,6 @@ bool commands_execute(const char* cmd) {
             out_error("FMT", "invalid arg");
             return false;
         }
-        return true;
-    }
-    
-    // Initialize filter from sensors
-    if (starts_with(cmd, "INIT")) {
-        imu.read();
-        mag.read();
-        if (sensors_mag_ok()) {
-            filter.init_from_sensors(
-                imu.data().accel[0], imu.data().accel[1], imu.data().accel[2],
-                mag.data().mag[0], mag.data().mag[1], mag.data().mag[2]
-            );
-        } else {
-            filter.init_from_accel(
-                imu.data().accel[0], imu.data().accel[1], imu.data().accel[2]
-            );
-        }
-        out_ack("INIT");
-        return true;
-    }
-    
-    // Status
-    if (starts_with(cmd, "STATUS")) {
-        out_status(
-            sensors_imu_ok(),
-            sensors_mag_ok(),
-            sensors_pwr_ok(),
-            filter.yaw(),
-            filter.pitch(),
-            filter.roll(),
-            pwr.data().load_voltage_V,
-            pwr.data().current_mA,
-            motors_get_left(),
-            motors_get_right()
-        );
         return true;
     }
     
