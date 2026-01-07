@@ -2,6 +2,8 @@
 log/*
 *.code-workspace*
 rover_esp_driver/*/lib/*
-.pio/*
+/**/.pio/*
+/**/.vscode/*
+/**/.DS_STORE
 __pycache__/*
 *.pyc
