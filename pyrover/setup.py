@@ -27,6 +27,7 @@ setup(
     install_requires=[
         'setuptools',
         'pyserial>=3.5',
+        'websockets'
     ],
     
     extras_require={
@@ -56,7 +57,6 @@ setup(
         'console_scripts': [
             # Calibration tools
             'pyrover-calibrate-motors = pyrover.calibration.motor:run_motor_calibration_cli',
-            'pyrover-calibrate-motioncal = pyrover.calibration.remote_motioncal:run_calibrator_cli',
             
             # Test tool
             'pyrover-test = pyrover.tests.test_commands:run_command_test_cli',

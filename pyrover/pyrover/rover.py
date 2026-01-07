@@ -34,30 +34,58 @@ import logging
 import serial
 import time
 import threading
-from typing import Optional, Callable
+from typing import Optional, Callable, Dict
 from dataclasses import dataclass
 
 from .commands import OutputPrefix, MAX_PWM, MIN_PWM
-from .data_types import (IMUData,
-                         PowerData,
-                         RawSensorData,
-                         Orientation)
 
 from .tools import log_exceptions
 
 
-@dataclass
+
 class RoverCallbacks:
     """Callback functions for different message types."""
-    on_imu: Optional[Callable[[IMUData], None]] = None
-    on_power: Optional[Callable[[PowerData], None]] = None
-    on_raw: Optional[Callable[[RawSensorData], None]] = None
-    on_orientation: Optional[Callable[[Orientation], None]] = None
-    on_system: Optional[Callable[[str], None]] = None
-    on_ack: Optional[Callable[[str], None]] = None
-    on_error: Optional[Callable[[str], None]] = None
-    on_line: Optional[Callable[[str], None]] = None  # Raw line callback
+    def __init__(self,
+                 on_imu = None,
+                 on_power = None,
+                 on_raw = None,
+                 on_orientation = None,
+                 on_system = None,
+                 on_ack = None,
+                 on_error = None,
+                 on_line = None
+                 ):
+        self._on_imu: Optional[Callable[[str], None]] = on_imu
+        self._on_power: Optional[Callable[[str], None]] = on_power
+        self._on_raw: Optional[Callable[[str], None]] = on_raw
+        self._on_orientation: Optional[Callable[[str], None]] = on_orientation
+        self._on_system: Optional[Callable[[str], None]] = on_system
+        self._on_ack: Optional[Callable[[str], None]] = on_ack
+        self._on_error: Optional[Callable[[str], None]] = on_error
+        self._on_line: Optional[Callable[[str], None]] = on_line
 
+        self._dispatch: Dict[str, Optional[Callable]] = {
+            OutputPrefix.IMU: self._on_imu,
+            OutputPrefix.POWER: self._on_power,
+            OutputPrefix.RAW: self._on_raw,
+            OutputPrefix.ORI: self._on_orientation,
+            OutputPrefix.SYSTEM: self._on_system,
+            OutputPrefix.ACK: self._on_ack,
+            OutputPrefix.ERROR: self._on_error,
+        }
+
+    @log_exceptions
+    def _parse_line(self, line: str):
+        """Sends a message to the appropriate callback"""
+        if self._on_line:
+            self._on_line(line)
+        
+        # Find and call the appropriate callback
+        for prefix, callback in self._dispatch.items():
+            if line.startswith(prefix):
+                if callback:  
+                    callback(line)
+                break  
 
 class PyRover:
     """
@@ -101,13 +129,7 @@ class PyRover:
         self._running = False
         self._lock = threading.Lock()
         
-        # Latest data (updated by read thread)
-        self._latest_imu: Optional[IMUData] = None
-        self._latest_power: Optional[PowerData] = None
-        self._latest_ori: Optional[Orientation] = None
-        self._imu_lock = threading.Lock()
-        self._power_lock = threading.Lock()
-        self._ori_lock = threading.Lock()
+
         self._logger = logging.getLogger(f"PyRover")
         
         if auto_connect:
@@ -180,7 +202,7 @@ class PyRover:
                         try:
                             decoded = line.decode('utf-8').strip()
                             if decoded:
-                                self._parse_line(decoded)
+                                self.callbacks._parse_line(decoded)
                         except UnicodeDecodeError:
                             pass
                 else:
@@ -188,62 +210,6 @@ class PyRover:
             except Exception:
                 if self._running:
                     time.sleep(0.01)
-    
-    @log_exceptions
-    def _parse_line(self, line: str) -> None:
-        """Parse a received line and dispatch to appropriate callback."""
-        
-        # IMU telemetry
-        if line.startswith(OutputPrefix.IMU):
-            data = IMUData.from_line(line)
-            if data:
-                with self._imu_lock:
-                    self._latest_imu = data
-                if self.callbacks.on_imu:
-                    self.callbacks.on_imu(data)
-        
-        # Power data
-        elif line.startswith(OutputPrefix.POWER):
-            data = PowerData.from_line(line)
-            if data:
-                with self._power_lock:
-                    self._latest_power = data
-                if self.callbacks.on_power:
-                    self.callbacks.on_power(data)
-        
-        # MotionCal raw data
-        elif line.startswith(OutputPrefix.RAW):
-            data = RawSensorData.from_line(line)
-            if data and self.callbacks.on_raw:
-                self.callbacks.on_raw(data)
-        
-        # MotionCal orientation
-        elif line.startswith(OutputPrefix.ORI):
-            data = Orientation.from_line(line)
-            if data:
-                with self._ori_lock:
-                    self._latest_ori = data
-                if self.callbacks.on_orientation:
-                    self.callbacks.on_orientation(data)
-        
-        # System message
-        elif line.startswith(OutputPrefix.SYSTEM):
-            if self.callbacks.on_system:
-                self.callbacks.on_system(line)
-        
-        # Acknowledgment
-        elif line.startswith(OutputPrefix.ACK):
-            if self.callbacks.on_ack:
-                self.callbacks.on_ack(line)
-        
-        # Error
-        elif line.startswith(OutputPrefix.ERROR):
-            if self.callbacks.on_error:
-                self.callbacks.on_error(line)
-
-        
-        elif self.callbacks.on_line:
-            self.callbacks.on_line(line)
     
     def send(self, command: str) -> None:
         """
@@ -257,23 +223,7 @@ class PyRover:
         
         with self._lock:
             self._ser.write(command.encode() + b'\n')  # type: ignore
-    
-    # =========================================================================
-    # Data Access
-    # =========================================================================
-    
-    @property
-    def imu(self) -> Optional[IMUData]:
-        """Get latest IMU data (thread-safe)."""
-        with self._imu_lock:
-            return self._latest_imu
-    
-    @property
-    def power(self) -> Optional[PowerData]:
-        """Get latest power data (thread-safe)."""
-        with self._power_lock:
-            return self._latest_power
-    
+        
     # =========================================================================
     # Motion Control
     # =========================================================================

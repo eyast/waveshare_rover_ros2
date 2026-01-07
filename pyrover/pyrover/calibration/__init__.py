@@ -30,12 +30,10 @@ from .motor import (
     FullCalibrationResult,
 )
 
-from .remote_motioncal import RemoteMotionCal
 
 __all__ = [
     "MotorCalibrator",
     "LinearCalibrationResult", 
     "AngularCalibrationResult",
     "FullCalibrationResult",
-    "RemoteMotionCal"
 ]

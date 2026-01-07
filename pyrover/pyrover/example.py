@@ -7,9 +7,7 @@ This example shows how to use the pyrover library standalone (no ROS2).
 """
 
 import time
-import logging
 from pyrover import PyRover, RoverCallbacks, IMUData, PowerData
-
 
 def on_imu(data: IMUData):
     """Called when IMU data is received."""
