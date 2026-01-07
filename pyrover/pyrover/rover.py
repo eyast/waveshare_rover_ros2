@@ -43,7 +43,7 @@ from .data_types import (IMUData,
                          RawSensorData,
                          Orientation)
 
-from . import log_exceptions
+from .tools import log_exceptions
 
 
 @dataclass
