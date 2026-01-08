@@ -18,7 +18,7 @@ def raw_cb(message: str):
 def main(host: str, port: int, device: str):
     # Connect to rover
     print(f"Opening {device}...")
-    cb = RoverCallbacks(on_raw=raw_cb)
+    cb = RoverCallbacks(on_raw=raw_cb, on_orientation=raw_cb)
     rover = PyRover(device, 115200, auto_connect=True, callbacks=cb)
     rover.calib_off()
     time.sleep(2)
@@ -39,7 +39,7 @@ def main(host: str, port: int, device: str):
             if items:
                 line = items.popleft()
                 # Send it over TCP
-                sock.sendall(line)
+                sock.sendall((line + '\n').encode('utf-8'))
                 counter += 1
                 if counter % 500 == 0:
                     print(f"Sent {counter} messages")
