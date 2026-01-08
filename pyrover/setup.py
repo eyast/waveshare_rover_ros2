@@ -27,7 +27,7 @@ setup(
     install_requires=[
         'setuptools',
         'pyserial>=3.5',
-        'websockets'
+        'httpx'
     ],
     
     extras_require={
