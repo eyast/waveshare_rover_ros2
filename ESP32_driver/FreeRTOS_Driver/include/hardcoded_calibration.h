@@ -34,24 +34,24 @@ extern bool USE_GYROSCOPE_CALIB;
 // =============================================================================
 // These compensate for permanent magnetic fields from nearby components
 
-#define MAG_HARD_IRON_X      23.06f // 34.00f
-#define MAG_HARD_IRON_Y     -35.88f //-35.76f
-#define MAG_HARD_IRON_Z     -5.39f //-31.99f
+#define MAG_HARD_IRON_X      24.39f 
+#define MAG_HARD_IRON_Y     -38.29f 
+#define MAG_HARD_IRON_Z     -15.07f 
 
 // =============================================================================
 // Soft Iron Correction Matrix
 // =============================================================================
 // Compensates for distortions in the magnetic field
 
-#define MAG_SOFT_IRON_00    1.009f //1.025f
-#define MAG_SOFT_IRON_01    0.007f //0.023f
-#define MAG_SOFT_IRON_02    0.011f //-0.057f
-#define MAG_SOFT_IRON_10    0.007f //0.023f
-#define MAG_SOFT_IRON_11    1.020f //1.066f
-#define MAG_SOFT_IRON_12   -0.003f //-0.004f
-#define MAG_SOFT_IRON_20    0.011f //-0.057f
-#define MAG_SOFT_IRON_21   -0.033f //-0.004f
-#define MAG_SOFT_IRON_22    0.973f //0.919f
+#define MAG_SOFT_IRON_00    1.029f //1.025f
+#define MAG_SOFT_IRON_01    0.015f //0.023f
+#define MAG_SOFT_IRON_02   -0.025f //-0.057f
+#define MAG_SOFT_IRON_10    0.015f //0.023f
+#define MAG_SOFT_IRON_11    1.038f //1.066f
+#define MAG_SOFT_IRON_12   -0.007f //-0.004f
+#define MAG_SOFT_IRON_20   -0.025f //-0.057f
+#define MAG_SOFT_IRON_21   -0.007f //-0.004f
+#define MAG_SOFT_IRON_22    0.937f //0.919f
 
 // Expected field strength after calibration
 #define MAG_FIELD_STRENGTH  57.51f // 55.91f  // µT

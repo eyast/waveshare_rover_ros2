@@ -12,6 +12,8 @@
 static char cmd_buffer[128];
 static uint8_t cmd_index = 0;
 
+extern bool USE_HARDCODED_CAL;
+
 // =============================================================================
 // Initialization
 // =============================================================================
@@ -135,7 +137,10 @@ bool commands_execute(const char* cmd) {
             out_ack("CALIB", "OFF");
             delay(100);
             ESP.restart();
-        } else {
+        } else if (starts_with(arg, "STATUS")) {
+            out_system("CALIB", USE_HARDCODED_CAL);
+        }
+        else {
             out_error("CALIB", "invalid arg");
             return false;
         }
