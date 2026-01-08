@@ -100,8 +100,8 @@
 #define STACK_SIZE_IMU      4096
 #define STACK_SIZE_TELEM    3072
 #define STACK_SIZE_CMD      3072
-#define STACK_SIZE_POWER    2048
-#define STACK_SIZE_WDT      2048
+#define STACK_SIZE_POWER    3072
+#define STACK_SIZE_WDT      3072
 
 // Task priorities (higher = more important)
 #define PRIORITY_IMU        5       // Highest - sensor fusion

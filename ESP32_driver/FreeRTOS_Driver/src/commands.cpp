@@ -7,6 +7,7 @@
 #include "motors.h"
 #include "sensors.h"
 #include "oled.h"
+#include "watchdog.h"
 
 // Command buffer
 static char cmd_buffer[128];
@@ -68,6 +69,23 @@ bool commands_execute(const char* cmd) {
         return true;
     }
     
+    // Watchdog status
+    if (starts_with(cmd, "WDT:")) {
+        const char* arg = cmd + 4;
+        
+        if (starts_with(arg, "STATUS")) {
+            watchdog_print_status();
+            out_ack("WDT", "STATUS");
+        } else if (starts_with(arg, "STACK")) {
+            watchdog_print_stack_usage();
+            out_ack("WDT", "STACK");
+        } else {
+            out_error("WDT", "unknown arg (use STATUS or STACK)");
+            return false;
+        }
+        return true;
+    }
+
     // Motor control: M:left,right
     if (starts_with(cmd, "M:")) {
         int left, right;
