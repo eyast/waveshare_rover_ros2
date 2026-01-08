@@ -262,6 +262,20 @@ class PyRover:
         self.send("HB")
     
     # =========================================================================
+    # Calibartion Control
+    # =========================================================================
+
+    @log_exceptions
+    def calib_on(self) -> None:
+        """Load calibration data from memory"""
+        self.send("CALIB:ON")
+
+    @log_exceptions
+    def calib_off(self) -> None:
+        """Do not load calibration data from memory"""
+        self.send("CALIB:OFF")
+
+    # =========================================================================
     # Streaming Control
     # =========================================================================
     

@@ -835,6 +835,14 @@ class IMUVisualizer:
                             self.running = False
                         elif event.key == K_SPACE:
                             self.renderer_3d.toggle_view()
+                        elif event.key == K_q:
+                            if self.serial_handler.serial_port and self.serial_handler.serial_port.is_open:
+                                self.serial_handler.serial_port.write(b"CALIB:ON\n")
+                                print("Sent: CALIB:ON")
+                        elif event.key == K_a:
+                            if self.serial_handler.serial_port and self.serial_handler.serial_port.is_open:
+                                self.serial_handler.serial_port.write(b"CALIB:OFF\n")
+                                print("Sent: CALIB:OFF")
 
                 self._process_serial_data()
                 self._render()
