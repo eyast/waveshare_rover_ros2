@@ -9,7 +9,7 @@ import argparse
 import time
 from pyrover import PyRover, RoverCallbacks
 
-items = deque(maxlen=10000)
+items = deque(maxlen=100)
 
 def raw_cb(message: str):
     if message.startswith("Raw"):
@@ -29,6 +29,8 @@ def main(host: str, port: int, device: str):
     # Connect to server
     print(f"Connecting to {host}:{port}...")
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+    sock.settimeout(0.1)
     sock.connect((host, port))
     print("Connected!")
     time.sleep(2)
@@ -45,6 +47,9 @@ def main(host: str, port: int, device: str):
                     print(f"Sent {counter} messages")
     except KeyboardInterrupt:
         print("\nStopping...")
+    except socket.timeout:
+    # Skip this message if send takes too long
+        pass
     finally:
         sock.close()
 
