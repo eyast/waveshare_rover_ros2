@@ -101,7 +101,7 @@
 #define STACK_SIZE_TELEM    3072
 #define STACK_SIZE_CMD      3072
 #define STACK_SIZE_POWER    2048
-#define STACK_SIZE_WDT      1024
+#define STACK_SIZE_WDT      2048
 
 // Task priorities (higher = more important)
 #define PRIORITY_IMU        5       // Highest - sensor fusion
@@ -120,6 +120,20 @@
 // =============================================================================
 
 #define WDT_TIMEOUT_SEC     10      // Reset if tasks don't respond for 10s
+
+// Task Health Monitoring
+#define WDT_MONITOR_ENABLED     true    // Enable task health monitoring
+#define WDT_CHECK_INTERVAL_MS   1000    // How often to check task health
+
+// Task timeout thresholds (ms) - how long before we consider a task dead
+#define WDT_TIMEOUT_IMU_MS      500     // IMU should update every 10ms, 500ms = very stuck
+#define WDT_TIMEOUT_TELEM_MS    2000    // Telemetry can be slower
+#define WDT_TIMEOUT_CMD_MS      5000    // Commands are sporadic, allow more time
+#define WDT_TIMEOUT_POWER_MS    1000    // Power monitoring should be regular
+
+// Watchdog actions
+#define WDT_ACTION_REBOOT       true    // Reboot on task failure
+#define WDT_ACTION_LOG_ONLY     false   // Just log errors (for debugging)
 
 // =============================================================================
 // Protocol Message Prefixes
