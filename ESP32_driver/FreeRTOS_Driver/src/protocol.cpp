@@ -23,23 +23,20 @@ static char msg_buffer[256];
 // =============================================================================
 
 Preferences preferences;
-bool CALIB;
-bool USE_HARDCODED_CAL;
-bool USE_ACCELEROMETER_CAL;
-bool USE_GYROSCOPE_CALIB;
+bool NVS_CALIBRATION;
+
 
 void preferences_init() {
     preferences.begin(CONFIGKEY, false);
     if (!preferences.isKey(CALIBKEY)) {
         out_system("NVS", "NVS does not contain USECALILB flag");
-        CALIB = false;
+        NVS_CALIBRATION = false;
         preferences.putBool(CALIBKEY, false); 
     } else {
-        CALIB = preferences.getBool(CALIBKEY);
+        NVS_CALIBRATION = preferences.getBool(CALIBKEY);
         out_system("NVS", "NVS contains CALIB flag");
-        out_system("NVS", CALIB);
+        out_system("NVS", NVS_CALIBRATION);
   }
-  USE_HARDCODED_CAL, USE_ACCELEROMETER_CAL, USE_GYROSCOPE_CALIB = CALIB;
   preferences.end();
 }
 

@@ -25,9 +25,7 @@
 // #define USE_GYROSCOPE_CALIB     true
 
 // Ue the preferences.h library - load the value from flash
-extern bool USE_HARDCODED_CAL;
-extern bool USE_ACCELEROMETER_CAL;
-extern bool USE_GYROSCOPE_CALIB;
+extern bool NVS_CALIBRATION;
 
 // =============================================================================
 // Hard Iron Offsets (in µT)
@@ -63,23 +61,23 @@ extern bool USE_GYROSCOPE_CALIB;
 // =============================================================================
 
 inline void apply_hardcoded_calibration(AK09918C& mag) {
-#if USE_HARDCODED_CAL
-    // Hard iron correction
-    mag.set_hard_iron(
-        MAG_HARD_IRON_X,
-        MAG_HARD_IRON_Y,
-        MAG_HARD_IRON_Z
-    );
+    if (NVS_CALIBRATION){
+        // Hard iron correction
+        mag.set_hard_iron(
+            MAG_HARD_IRON_X,
+            MAG_HARD_IRON_Y,
+            MAG_HARD_IRON_Z
+        );
+        
+        // Soft iron correction
+        const float soft_iron[3][3] = {
+            { MAG_SOFT_IRON_00, MAG_SOFT_IRON_01, MAG_SOFT_IRON_02 },
+            { MAG_SOFT_IRON_10, MAG_SOFT_IRON_11, MAG_SOFT_IRON_12 },
+            { MAG_SOFT_IRON_20, MAG_SOFT_IRON_21, MAG_SOFT_IRON_22 }
+        };
+        mag.set_soft_iron(soft_iron);
     
-    // Soft iron correction
-    const float soft_iron[3][3] = {
-        { MAG_SOFT_IRON_00, MAG_SOFT_IRON_01, MAG_SOFT_IRON_02 },
-        { MAG_SOFT_IRON_10, MAG_SOFT_IRON_11, MAG_SOFT_IRON_12 },
-        { MAG_SOFT_IRON_20, MAG_SOFT_IRON_21, MAG_SOFT_IRON_22 }
-    };
-    mag.set_soft_iron(soft_iron);
-    
-#endif
+    }
 }
 
 // =============================================================================
@@ -128,20 +126,20 @@ inline void apply_hardcoded_calibration(AK09918C& mag) {
 // =============================================================================
 
 inline void apply_accelerometer_calibration(QMI8658C& imu) {
-#if USE_ACCELEROMETER_CAL
-    float acc_calib_matrix[3][3] = {
-        { ACC_CALIB_00, ACC_CALIB_01, ACC_CALIB_02 },
-        { ACC_CALIB_10, ACC_CALIB_11, ACC_CALIB_12 },
-        { ACC_CALIB_20, ACC_CALIB_21, ACC_CALIB_22 }
-    };
+    if (NVS_CALIBRATION){
+        float acc_calib_matrix[3][3] = {
+            { ACC_CALIB_00, ACC_CALIB_01, ACC_CALIB_02 },
+            { ACC_CALIB_10, ACC_CALIB_11, ACC_CALIB_12 },
+            { ACC_CALIB_20, ACC_CALIB_21, ACC_CALIB_22 }
+        };
 
-    imu.set_accel_calib(
-        ACC_CALIB_BIAS_X,
-        ACC_CALIB_BIAS_Y,
-        ACC_CALIB_BIAS_Z,
-        acc_calib_matrix
-    );
-#endif
+        imu.set_accel_calib(
+            ACC_CALIB_BIAS_X,
+            ACC_CALIB_BIAS_Y,
+            ACC_CALIB_BIAS_Z,
+            acc_calib_matrix
+        );
+    }
 }
 
 // =============================================================================
@@ -156,13 +154,13 @@ inline void apply_accelerometer_calibration(QMI8658C& imu) {
 #define GYRO_CALIB_BIAS_Z    29.260097817407505f
 
 inline void apply_gyroscope_calibration(QMI8658C& imu) {
-#if USE_GYROSCOPE_CALIB
-    imu.set_gyro_calib(
-        GYRO_CALIB_BIAS_X,
-        GYRO_CALIB_BIAS_Y,
-        GYRO_CALIB_BIAS_Z
-    );
-#endif
+    if (NVS_CALIBRATION){
+        imu.set_gyro_calib(
+            GYRO_CALIB_BIAS_X,
+            GYRO_CALIB_BIAS_Y,
+            GYRO_CALIB_BIAS_Z
+        );
+    }
 }
 
 #endif // HARDCODED_CALIBRATION_H

@@ -12,7 +12,7 @@
 static char cmd_buffer[128];
 static uint8_t cmd_index = 0;
 
-extern bool USE_HARDCODED_CAL;
+extern bool NVS_CALIBRATION;
 
 // =============================================================================
 // Initialization
@@ -130,15 +130,17 @@ bool commands_execute(const char* cmd) {
         if (starts_with(arg, "ON")) {
             calib_set_flag(true);
             out_ack("CALIB", "ON");
-            delay(100);
+            Serial.flush();
+            delay(500);
             ESP.restart();
         } else if (starts_with(arg, "OFF")) {
             calib_set_flag(false);
             out_ack("CALIB", "OFF");
-            delay(100);
+            Serial.flush();
+            delay(500);
             ESP.restart();
         } else if (starts_with(arg, "STATUS")) {
-            out_system("CALIB", USE_HARDCODED_CAL);
+            out_system("CALIB", NVS_CALIBRATION);
         }
         else {
             out_error("CALIB", "invalid arg");
@@ -166,7 +168,8 @@ bool commands_execute(const char* cmd) {
     // Reboot
     if (starts_with(cmd, "REBOOT")) {
         out_ack("REBOOT");
-        delay(100);
+        Serial.flush();
+        delay(500);
         ESP.restart();
         return true;
     }

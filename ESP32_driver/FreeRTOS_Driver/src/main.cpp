@@ -230,9 +230,6 @@ void setup() {
 
     // Retrieve configuration
     preferences_init();
-
-    out_system("USE_HARDCODED_CAL", USE_HARDCODED_CAL);
-    out_system("USE_ACCELEROMETER_CAL", USE_ACCELEROMETER_CAL);
     
     // Create mutex for sensor data
     sensor_mutex = xSemaphoreCreateMutex();
