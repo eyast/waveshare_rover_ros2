@@ -28,7 +28,7 @@ duration = 0.02
 
 async def main(host: str, port: int, device: str):
     firstboot = True
-    items = []
+    items = deque(maxlen=10000)
     last_time = time.time()
     
     def raw_cb(message: str):
@@ -62,7 +62,7 @@ async def main(host: str, port: int, device: str):
                 while True:
                     last_time = time.time()
                     if items:
-                        item = random.choice(items)
+                        item = items.popleft()
                         try:
                             # Send as POST request
                             response = await client.post(
@@ -70,14 +70,12 @@ async def main(host: str, port: int, device: str):
                                 content=item,
                                 headers={"Content-Type": "text/plain"}
                             )
+                            counter += 1
                             if response.status_code != 200:
                                 print(f"Warning: Server returned {response.status_code}")
                         except httpx.RequestError as e:
                             print(f"Request failed: {e}")
                             continue
-                        
-                    counter += 1
-                    
                     # Print progress every second
                     if counter % 1000 == 0:
                         elapsed = time.time() - start_time
