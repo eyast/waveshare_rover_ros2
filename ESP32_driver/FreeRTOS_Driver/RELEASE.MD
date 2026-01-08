@@ -26,3 +26,4 @@ added big endian
 fixed accelerator code
 fixed soft iron
 fixed call to is_overflow (out of index)
+load calibraation data flag from memory

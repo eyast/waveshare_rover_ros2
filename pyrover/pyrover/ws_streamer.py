@@ -24,7 +24,9 @@ from pyrover import PyRover, RoverCallbacks
 
 duration = 0.02
 
+
 async def main(host: str, port: int, device: str):
+    firstboot = True
     queue = deque(maxlen=1000)
     last_time = time.time()
     def raw_cb(message):
@@ -35,7 +37,10 @@ async def main(host: str, port: int, device: str):
     rover = PyRover(device, 115200, callbacks=cb, auto_connect=True)
     uri = f"ws://{host}:{port}/ws"
     print(f"Connecting to {uri}...")
-    with PyRover('/dev/serial0') as rover:
+    with PyRover('/dev/serial0', auto_connect=True) as rover:
+        if firstboot == True:
+            rover.calib_off()
+            firstboot = False
         rover.stream_on()
         rover.set_format_raw()
         print("Rover connected")
