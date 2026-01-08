@@ -101,7 +101,7 @@ TaskStats watchdog_get_stats(TaskID task_id) {
 
 void watchdog_print_status() {
     // No header - each line is self-contained with WDT prefix
-    
+    // S:WDT,HEALTH:<task_name>,<status>,<ms_since_last_heartbeat>,<failure_count>
     for (int i = 0; i < 4; i++) {
         TaskStats stats = watchdog_get_stats((TaskID)i);
         
@@ -118,7 +118,7 @@ void watchdog_print_status() {
 
 void watchdog_print_stack_usage() {
     // No header - each line is self-contained with WDT prefix
-    
+    // S:WDT,STACK:<task_name>,<used_bytes>,<total_bytes>,<percent_used>,<free_bytes>
     for (int i = 0; i < 4; i++) {
         if (task_health[i].handle == NULL) {
             char msg[64];
