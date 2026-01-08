@@ -19,6 +19,7 @@ from collections import deque
 import asyncio
 import argparse
 import time
+import random
 import websockets
 from pyrover import PyRover, RoverCallbacks
 
@@ -27,10 +28,11 @@ duration = 0.02
 
 async def main(host: str, port: int, device: str):
     firstboot = True
-    queue = deque(maxlen=1000)
+    items = []
     last_time = time.time()
-    def raw_cb(message):
-        queue.append(message)
+    def raw_cb(message:str):
+        if message.startswith("Raw"):
+            items.append(message)
 
     
     cb = RoverCallbacks(on_raw=raw_cb)
@@ -41,6 +43,7 @@ async def main(host: str, port: int, device: str):
         if firstboot == True:
             rover.calib_off()
             firstboot = False
+        time.sleep(5)
         rover.stream_on()
         rover.set_format_raw()
         print("Rover connected")
@@ -49,13 +52,14 @@ async def main(host: str, port: int, device: str):
                 print(f"Connected!")         
                 counter = 0
                 start_time = time.time()              
-                while time.time() - last_time > duration:
+                while True:
                     last_time = time.time()
-                    if queue:
-                        await ws.send(queue.pop())
+                    if items:
+                        item = random.choice(items)
+                        await ws.send(item)
                     counter += 1               
                     # Print progress every second
-                    if counter % 50 == 0:
+                    if counter % 1000 == 0:
                         elapsed = time.time() - start_time
                         rate = counter / elapsed
                         print(f"  Sent: {counter}, Rate: {rate:.1f} msg/s")                
