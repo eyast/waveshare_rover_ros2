@@ -58,7 +58,7 @@ setup(
             # Calibration tools
             'pyrover-calibrate-motors = pyrover.calibration.motor:run_motor_calibration_cli',
             
-            # Test tool
+            # TCP streamer (to remote machine running listener + MotionCal)
             'pyrover-test = pyrover.tests.test_commands:run_command_test_cli',
         ],
     },

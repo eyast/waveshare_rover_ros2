@@ -7,10 +7,13 @@
 #include "motors.h"
 #include "sensors.h"
 #include "oled.h"
+#include "watchdog.h"
 
 // Command buffer
 static char cmd_buffer[128];
 static uint8_t cmd_index = 0;
+
+extern bool NVS_CALIBRATION;
 
 // =============================================================================
 // Initialization
@@ -66,6 +69,23 @@ bool commands_execute(const char* cmd) {
         return true;
     }
     
+    // Watchdog status
+    if (starts_with(cmd, "WDT:")) {
+        const char* arg = cmd + 4;
+        
+        if (starts_with(arg, "STATUS")) {
+            watchdog_print_status();
+            out_ack("WDT", "STATUS");
+        } else if (starts_with(arg, "STACK")) {
+            watchdog_print_stack_usage();
+            out_ack("WDT", "STACK");
+        } else {
+            out_error("WDT", "unknown arg (use STATUS or STACK)");
+            return false;
+        }
+        return true;
+    }
+
     // Motor control: M:left,right
     if (starts_with(cmd, "M:")) {
         int left, right;
@@ -128,14 +148,19 @@ bool commands_execute(const char* cmd) {
         if (starts_with(arg, "ON")) {
             calib_set_flag(true);
             out_ack("CALIB", "ON");
-            delay(100);
+            Serial.flush();
+            delay(500);
             ESP.restart();
         } else if (starts_with(arg, "OFF")) {
             calib_set_flag(false);
             out_ack("CALIB", "OFF");
-            delay(100);
+            Serial.flush();
+            delay(500);
             ESP.restart();
-        } else {
+        } else if (starts_with(arg, "STATUS")) {
+            out_system("CALIB", NVS_CALIBRATION);
+        }
+        else {
             out_error("CALIB", "invalid arg");
             return false;
         }
@@ -161,7 +186,8 @@ bool commands_execute(const char* cmd) {
     // Reboot
     if (starts_with(cmd, "REBOOT")) {
         out_ack("REBOOT");
-        delay(100);
+        Serial.flush();
+        delay(500);
         ESP.restart();
         return true;
     }

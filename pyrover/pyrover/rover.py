@@ -276,6 +276,35 @@ class PyRover:
         self.send("CALIB:OFF")
 
     # =========================================================================
+    # WDT Control
+    # =========================================================================
+
+    @log_exceptions
+    def wdt_status(self) -> None:
+        """Get Status of ESP32 Watchdog
+        
+        Returns:
+        S:WDT,HEALTH:<task_name>,
+                     <status>,
+                     <ms_since_last_heartbeat>,
+                     <failure_count>
+        """
+        self.send("WDT:STATUS")
+
+    @log_exceptions
+    def wdt_stack(self) -> None:
+        """Get Stack information
+        
+        Returns:
+        S:WDT,STACK:<task_name>,
+                    <used_bytes>,
+                    <total_bytes>,
+                    <percent_used>,
+                    <free_bytes>
+        """
+        self.send("WDT:STACK")
+
+    # =========================================================================
     # Streaming Control
     # =========================================================================
     

@@ -23,7 +23,13 @@
  *                        Accelerometer (Bias and Calibration 
  *                                       Matrix)
  *   CALIB:OFF       - Disable all the adjustments above
+ *   CALIB:STATUS    - Get Calibration status
+ *                     0 - Calibration is not applied
+ *                     1 - Calibration is applied
  *   
+ *   WDT:STATUS      - Show only task health status
+ *   WDT:STACK       - Show only stack usage
+ * 
  *   REBOOT          - Reboot device
  *   HB              - Heartbeat (reset motor timeout)
  */

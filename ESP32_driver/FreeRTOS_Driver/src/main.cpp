@@ -6,6 +6,8 @@
  *   - AK09918C magnetometer
  *   - INA219 power monitor
  *   - Dual H-bridge motor control
+ *   - Serial port communication
+ *   - Task scheduling
  * 
  * Tasks:
  *   - IMU Task: Reads sensors, Fuse using Madgwick
@@ -28,7 +30,7 @@
 #include "oled.h"
 #include "SensorFusion.h"
 #include "hardcoded_calibration.h"
-
+#include "watchdog.h"
 
 
 // =============================================================================
@@ -67,6 +69,13 @@ static void imu_task(void* param) {
     (void)param;
     
     TickType_t last_wake = xTaskGetTickCount();
+
+    while (!watchdog_is_ready()) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    // Initialize heartbeat
+    watchdog_heartbeat(TaskID::IMU);
     
     while (true) {
         // Read sensors
@@ -84,7 +93,8 @@ static void imu_task(void* param) {
                     mag_data.mag[0], mag_data.mag[1], mag_data.mag[2],
                     deltat
             );
-            
+            watchdog_heartbeat(TaskID::IMU);
+
             xSemaphoreGive(sensor_mutex);
         }
         
@@ -102,6 +112,12 @@ static void telem_task(void* param) {
     (void)param;
     
     TickType_t last_wake = xTaskGetTickCount();
+
+    while (!watchdog_is_ready()) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+    // Initialize heartbeat
+    watchdog_heartbeat(TaskID::TELEMETRY);
     
     while (true) {
         if (protocol_get_streaming()) {
@@ -143,6 +159,8 @@ static void telem_task(void* param) {
             }
         }
         
+        watchdog_heartbeat(TaskID::TELEMETRY);
+
         // Run at telemetry rate (e.g., 50Hz)
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(TELEM_INTERVAL_IMU_MS));
     }
@@ -156,10 +174,20 @@ static void telem_task(void* param) {
 static void cmd_task(void* param) {
     (void)param;
     
+    while (!watchdog_is_ready()) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    // Initialize heartbeat
+    watchdog_heartbeat(TaskID::COMMAND);
+
     while (true) {
         // Process serial commands
         commands_process();
         
+        // Report heartbeat
+        watchdog_heartbeat(TaskID::COMMAND);
+
         // Short delay to prevent busy-waiting
         vTaskDelay(pdMS_TO_TICKS(5));
     }
@@ -176,6 +204,13 @@ static void power_task(void* param) {
     TickType_t last_wake = xTaskGetTickCount();
     uint32_t telem_counter = 0;
     
+    while (!watchdog_is_ready()) {
+        vTaskDelay(pdMS_TO_TICKS(10));
+    }
+
+    // Initialize heartbeat
+    watchdog_heartbeat(TaskID::POWER);
+
     while (true) {
         // Read power monitor
         pwr.read();
@@ -194,28 +229,10 @@ static void power_task(void* param) {
             out_power(data.load_voltage_V, data.current_mA, data.power_mW, data.shunt_voltage_mV);
         }
         
+        // Report heartbeat
+        watchdog_heartbeat(TaskID::POWER);
+
         vTaskDelayUntil(&last_wake, pdMS_TO_TICKS(PERIOD_POWER_MS));
-    }
-}
-
-// =============================================================================
-// Watchdog Task
-// =============================================================================
-// Monitors system health and feeds watchdog
-
-static void wdt_task(void* param) {
-    (void)param;
-    
-    // Subscribe this task to watchdog
-    esp_task_wdt_add(NULL);
-    
-    while (true) {
-        // Feed the watchdog
-        esp_task_wdt_reset();
-        
-        // Could add more health checks here
-        
-        vTaskDelay(pdMS_TO_TICKS(PERIOD_WDT_MS));
     }
 }
 
@@ -230,12 +247,13 @@ void setup() {
 
     // Retrieve configuration
     preferences_init();
-
-    out_system("USE_HARDCODED_CAL", USE_HARDCODED_CAL);
-    out_system("USE_ACCELEROMETER_CAL", USE_ACCELEROMETER_CAL);
     
     // Create mutex for sensor data
     sensor_mutex = xSemaphoreCreateMutex();
+    if (sensor_mutex == NULL) {
+        out_error("BOOT", "Failed to create sensor mutex!");
+        while(1) { delay(1000); }  // Halt
+    }
     
     // Find initial guess for Quaternion to 
     // reduce drift
@@ -245,59 +263,41 @@ void setup() {
     commands_init();
     oled_init();  // Initialize OLED 
     
-    // Configure watchdog
-    esp_task_wdt_init(WDT_TIMEOUT_SEC, true);  // true = panic on timeout
+    // Initialize watchdog system
+    watchdog_init();
     
-    // Create FreeRTOS tasks
-    xTaskCreatePinnedToCore(
-        imu_task,
-        "IMU",
-        STACK_SIZE_IMU,
-        NULL,
-        PRIORITY_IMU,
-        &imu_task_handle,
-        1  // Core 1 for time-critical sensor reading
-    );
+    // Configure hardware watchdog
+    esp_task_wdt_init(WDT_TIMEOUT_SEC, true);
     
-    xTaskCreatePinnedToCore(
-        telem_task,
-        "Telem",
-        STACK_SIZE_TELEM,
-        NULL,
-        PRIORITY_TELEM,
-        &telem_task_handle,
-        0  // Core 0 for I/O
-    );
+    // Create watchdog task FIRST
+    out_system("BOOT", "Creating watchdog task");
+    TaskHandle_t wdt_handle = watchdog_start_task();
+    if (wdt_handle == NULL) {
+        out_error("BOOT", "Failed to create watchdog!");
+        while(1) { delay(1000); }
+    }
     
-    xTaskCreatePinnedToCore(
-        cmd_task,
-        "Cmd",
-        STACK_SIZE_CMD,
-        NULL,
-        PRIORITY_CMD,
-        &cmd_task_handle,
-        0  // Core 0 for I/O
-    );
+    // Brief delay to let watchdog initialize
+    delay(100);
+
+    // Create other tasks
+    out_system("BOOT", "Creating tasks");
     
-    xTaskCreatePinnedToCore(
-        power_task,
-        "Power",
-        STACK_SIZE_POWER,
-        NULL,
-        PRIORITY_POWER,
-        &power_task_handle,
-        0
-    );
+    xTaskCreatePinnedToCore(imu_task, "IMU", STACK_SIZE_IMU, NULL, 
+                            PRIORITY_IMU, &imu_task_handle, 1);
+    watchdog_register_task(TaskID::IMU, imu_task_handle);  
     
-    xTaskCreatePinnedToCore(
-        wdt_task,
-        "WDT",
-        STACK_SIZE_WDT,
-        NULL,
-        PRIORITY_WDT,
-        &wdt_task_handle,
-        0
-    );
+    xTaskCreatePinnedToCore(telem_task, "Telem", STACK_SIZE_TELEM, NULL,
+                            PRIORITY_TELEM, &telem_task_handle, 0);
+    watchdog_register_task(TaskID::TELEMETRY, telem_task_handle);  
+    
+    xTaskCreatePinnedToCore(cmd_task, "Cmd", STACK_SIZE_CMD, NULL,
+                            PRIORITY_CMD, &cmd_task_handle, 0);
+    watchdog_register_task(TaskID::COMMAND, cmd_task_handle);  
+    
+    xTaskCreatePinnedToCore(power_task, "Power", STACK_SIZE_POWER, NULL,
+                            PRIORITY_POWER, &power_task_handle, 0);
+    watchdog_register_task(TaskID::POWER, power_task_handle); 
     
     out_system("BOOT", "ready");
 }

@@ -144,16 +144,10 @@ bool QMI8658C::read() {
     float accel_unbiased[3], gyro_unbiased[3];
     for (int i = 0; i < 3; i++) {
         data_.accel[i]= (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
-        gyro_unbiased[i] = data_.gyro_raw[i] - data_.gyro_bias[i];  // Bias in LSB!
+        gyro_unbiased[i] = data_.gyro_raw[i] - data_.gyro_bias[i];  
         data_.gyro_dps[i] = gyro_unbiased[i] * gyro_scale_;
         data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
     }
-    // for (int i = 0; i < 3; i++) {
-    //     data_.accel[i] = (data_.accel_raw[i] * accel_scale_) - data_.accel_bias[i];
-    //     //data_.gyro_dps[i] = (data_.gyro_raw[i] * gyro_scale_) - data_.gyro_bias[i];
-    //     data_.gyro_dps[i] = ((data_.gyro_raw[i] - data_.gyro_bias[i]  ) * gyro_scale_);
-    //     data_.gyro[i] = data_.gyro_dps[i] * (PI / 180.0f);
-    // }
     
     float ax_cal = data_.accel_calib_matrix[0][0] * data_.accel[0] +
                 data_.accel_calib_matrix[0][1] * data_.accel[1] +
