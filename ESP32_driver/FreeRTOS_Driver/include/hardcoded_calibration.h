@@ -20,9 +20,14 @@
 #include "sensors.h"
 
 // Enable/disable hardcoded calibration
-#define USE_HARDCODED_CAL       true
-#define USE_ACCELEROMETER_CAL   true
-#define USE_GYROSCOPE_CALIB     true
+// #define USE_HARDCODED_CAL       true
+// #define USE_ACCELEROMETER_CAL   true
+// #define USE_GYROSCOPE_CALIB     true
+
+// Ue the preferences.h library - load the value from flash
+extern bool USE_HARDCODED_CAL;
+extern bool USE_ACCELEROMETER_CAL;
+extern bool USE_GYROSCOPE_CALIB;
 
 // =============================================================================
 // Hard Iron Offsets (in µT)

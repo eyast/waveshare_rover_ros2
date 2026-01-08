@@ -121,6 +121,26 @@ bool commands_execute(const char* cmd) {
         }
         return true;
     }
+
+    // Calibration control: CALIB:ON/OFF
+    if (starts_with(cmd, "CALIB:")) {
+        const char* arg = cmd + 6;
+        if (starts_with(arg, "ON")) {
+            calib_set_flag(true);
+            out_ack("CALIB", "ON");
+            delay(100);
+            ESP.restart();
+        } else if (starts_with(arg, "OFF")) {
+            calib_set_flag(false);
+            out_ack("CALIB", "OFF");
+            delay(100);
+            ESP.restart();
+        } else {
+            out_error("CALIB", "invalid arg");
+            return false;
+        }
+        return true;
+    }
     
     // Format control: FMT:RAW/IMU
     if (starts_with(cmd, "FMT:")) {
@@ -142,7 +162,7 @@ bool commands_execute(const char* cmd) {
     if (starts_with(cmd, "REBOOT")) {
         out_ack("REBOOT");
         delay(100);
-        esp_restart();
+        ESP.restart();
         return true;
     }
     

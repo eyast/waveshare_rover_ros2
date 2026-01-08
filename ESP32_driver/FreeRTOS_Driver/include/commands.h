@@ -16,6 +16,13 @@
  *   STREAM:OFF      - Disable telemetry streaming
  *   FMT:RAW         - Use MotionCal format (Raw:/Ori:)
  *   FMT:IMU         - Use telemetry format (I:)
+ *   CALIB:ON        - Apply hardcoded calibration adjustment
+ *                     to the data streamed in RAW format
+ *                     to Magnetomer (Soft/Hard Iron)
+ *                        Gyroscope (Bias)
+ *                        Accelerometer (Bias and Calibration 
+ *                                       Matrix)
+ *   CALIB:OFF       - Disable all the adjustments above
  *   
  *   REBOOT          - Reboot device
  *   HB              - Heartbeat (reset motor timeout)

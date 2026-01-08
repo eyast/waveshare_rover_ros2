@@ -30,6 +30,7 @@
 #include "hardcoded_calibration.h"
 
 
+
 // =============================================================================
 // Sensor Fusion
 // =============================================================================
@@ -226,6 +227,10 @@ void setup() {
     // Initialize protocol first (Serial)
     protocol_init();
     out_system("BOOT", "starting");
+
+    // Retrieve configuration
+    preferences_init();
+
     out_system("USE_HARDCODED_CAL", USE_HARDCODED_CAL);
     out_system("USE_ACCELEROMETER_CAL", USE_ACCELEROMETER_CAL);
     

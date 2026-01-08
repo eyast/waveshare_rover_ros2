@@ -398,7 +398,11 @@ void sensors_init() {
     delay(100);
     
     // Initialize IMU
-    imu.begin();
+    if (imu.begin()){
+        apply_accelerometer_calibration(imu);
+        apply_gyroscope_calibration(imu);
+
+    }
     
     // Initialize Magnetometer
     if (mag.begin()) {
