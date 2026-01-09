@@ -19,42 +19,6 @@ ProtocolState protocol = {
 static char msg_buffer[256];
 
 // =============================================================================
-// Preferences
-// =============================================================================
-
-Preferences preferences;
-bool NVS_CALIBRATION;
-
-
-void preferences_init() {
-    preferences.begin(CONFIGKEY, false);
-    if (!preferences.isKey(CALIBKEY)) {
-        out_system("NVS", "NVS does not contain USECALILB flag");
-        NVS_CALIBRATION = false;
-        preferences.putBool(CALIBKEY, false); 
-    } else {
-        NVS_CALIBRATION = preferences.getBool(CALIBKEY);
-        out_system("NVS", "NVS contains CALIB flag");
-        out_system("NVS", NVS_CALIBRATION);
-  }
-  preferences.end();
-}
-
-void calib_set_flag(bool enabled){
-    preferences.begin(CONFIGKEY, false);
-    preferences.putBool(CALIBKEY, enabled);
-    preferences.end();
-}
-
-bool calib_get_flag(){
-    preferences.begin(CONFIGKEY, true);
-    bool retval;
-    retval = preferences.getBool(CALIBKEY);
-    preferences.end();
-    return retval;
-}
-
-// =============================================================================
 // Protocol Initiliazation
 // =============================================================================
 

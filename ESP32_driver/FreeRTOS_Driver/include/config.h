@@ -15,8 +15,9 @@
 // =============================================================================
 
 // String in NVS where Calibration boolean flag is stored
-#define CONFIGKEY           "CONFIG"
+#define CONFIGKEY          "CONFIG"
 #define CALIBKEY           "USECALIB"
+#define STREAMONBOOT       "STREAMONBOOT" 
 
 // =============================================================================
 // Hardware Pin Definitions

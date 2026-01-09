@@ -20,7 +20,7 @@
 
 #include <Arduino.h>
 #include "config.h"
-#include <Preferences.h>
+
 
 // =============================================================================
 // Output Channel Abstraction
@@ -57,12 +57,6 @@ extern ProtocolState protocol;
 void protocol_init();
 
 // =============================================================================
-// Preferences
-// =============================================================================
-
-void preferences_init();
-
-// =============================================================================
 // Output Mode Control
 // =============================================================================
 
@@ -74,10 +68,6 @@ StreamFormat protocol_get_format();
 
 void protocol_set_streaming(bool enabled);
 bool protocol_get_streaming();
-
-void calib_set_flag(bool enabled);
-bool calib_get_flag();
-
 
 // =============================================================================
 // Message Output Functions

@@ -8,12 +8,20 @@
 #include "sensors.h"
 #include "oled.h"
 #include "watchdog.h"
+#include "storage.h"
 
 // Command buffer
 static char cmd_buffer[128];
 static uint8_t cmd_index = 0;
 
 extern bool NVS_CALIBRATION;
+
+void restart_device() {
+    // Forces restarting the device if needed
+    Serial.flush();
+    delay(500);
+    ESP.restart();
+}
 
 // =============================================================================
 // Initialization
@@ -131,10 +139,15 @@ bool commands_execute(const char* cmd) {
         const char* arg = cmd + 7;
         if (starts_with(arg, "ON")) {
             protocol_set_streaming(true);
+            streamboot_set_flag(true);
             out_ack("STREAM", "ON");
         } else if (starts_with(arg, "OFF")) {
             protocol_set_streaming(false);
+            streamboot_set_flag(false);
             out_ack("STREAM", "OFF");
+        } else if (starts_with(arg, "STATUS")){
+            bool stream_enabled = protocol_get_streaming();
+            out_system("STREAM", stream_enabled);
         } else {
             out_error("STREAM", "invalid arg");
             return false;
@@ -148,15 +161,11 @@ bool commands_execute(const char* cmd) {
         if (starts_with(arg, "ON")) {
             calib_set_flag(true);
             out_ack("CALIB", "ON");
-            Serial.flush();
-            delay(500);
-            ESP.restart();
+            restart_device();
         } else if (starts_with(arg, "OFF")) {
             calib_set_flag(false);
             out_ack("CALIB", "OFF");
-            Serial.flush();
-            delay(500);
-            ESP.restart();
+            restart_device();
         } else if (starts_with(arg, "STATUS")) {
             out_system("CALIB", NVS_CALIBRATION);
         }

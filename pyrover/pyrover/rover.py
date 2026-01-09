@@ -15,11 +15,14 @@ Example:
 
 Protocol:
     Commands are simple line-based strings:
-        M:left,right    - Motor control (-255 to 255)
-        STOP            - Stop motors
-        HB              - Heartbeat
-        STREAM:ON/OFF   - Enable/disable telemetry
-        FMT:RAW/IMU     - Set output format
+        M:left,right                - Motor control (-255 to 255)
+        STOP                        - Stop motors
+        HB                          - Heartbeat
+        STREAM:ON/OFF/STATUS        - Enable/disable telemetry
+        CALIB:ON/OFF/STATUS         - Enable/Disable onboard calibration
+        WDT:STATUS/STACK            - Get Status/Stack of the Watchdog service
+        FMT:RAW/IMU                 - Set output format
+
     
     Responses have prefixes:
         I:...   - IMU telemetry
@@ -327,7 +330,11 @@ class PyRover:
     def set_format_raw(self) -> None:
         """Set output format to MotionCal (Raw: and Ori: messages)."""
         self.send("FMT:RAW")
-    
+
+    @log_exceptions
+    def stream_onboot_status(self) -> None:
+        """Get Status of Stream data"""
+        self.send("STREAM:STATUS")
     # =========================================================================
     # System
     # =========================================================================
